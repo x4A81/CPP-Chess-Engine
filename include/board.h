@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <string>
 #include <array>
+#include <stack>
+#include <vector>
 
 using BB = uint64_t;
 
@@ -41,31 +43,60 @@ int castling_rights = wking_side | wqueen_side;
 
 */
 
-enum CastlingRights : int {
+enum Castling_Rights : int {
     wking_side = 1,
     wqueen_side,
     bking_side = 4,
     bqueen_side = 8
 };
 
-class Board {
+/// Move encoding:
+/// 6 bits for the from square
+/// 6 bits for the to square
+// 4 bits for a code
+// code  | Promo | capt | special 1 | sp 2 | type
+/// 0    | 0     | 0    | 0         | 0    | quiet
+/// 1    | 0     | 0    | 0         | 1    | dbp pawn
+/// 2    | 0     | 0    | 1         | 0    | king castle
+/// 3    | 0     | 0    | 1         | 1    | q castle
+/// 4    | 0     | 1    | 0         | 0    | capture
+/// 5    | 0     | 1    | 0         | 1    | ep capture
+/// 8    | 1     | 0    | 0         | 0    | knight promo
+/// 9    | 1     | 0    | 0         | 1    | bishop promo
+/// 10   | 1     | 0    | 1         | 0    | rook promo
+/// 11   | 1     | 0    | 1         | 1    | queen promo
+/// 12   | 1     | 1    | 0         | 0    | knight promo capt
+/// 13   | 1     | 1    | 0         | 1    | bishop promo capt
+/// 14   | 1     | 1    | 1         | 0    | rook promo capt
+/// 15   | 1     | 1    | 1         | 1    | queen promo capt
+using Move = int16_t;
+#define nullmove 0
+
+enum Move_Code : int {
+    quiet, dbpush, kcastle, qcastle, capture, epcapture, 
+    npromo = 8, bpromo, rpromo, qpromo, c_npromo, c_bpromo, c_rpromo, c_qpromo
+};
+
+class Move_List {
+private:
+    std::array<Move, 256> _moves;
+    std::size_t _size;
+
 public:
-    Board() {
-        reset();
+    void add(Move move) { _moves.at(_size++) = move; }
+
+    void clear() {
+        _moves.fill(0);
+        _size = 0;
     }
 
-    Board(std::string fen) {
-        reset();
-        load_fen(fen);
-    }
+    auto begin() { return _moves.begin(); };
+    auto end() { return _moves.begin() + _size; }
+    bool is_empty() { return _size == 0 ? true : false; }
+};
 
-    Board(int load_start) {
-        reset();
-        if (!load_start) return;
-
-        load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    }
-
+using KEY = uint64_t;
+struct Board_State {
     std::array<BB, 15>bitboards{}; // p...kP...K black, white, all
     std::array<Pieces, 64>piece_list{};
     Squares enpassant_square;
@@ -73,10 +104,68 @@ public:
     uint8_t castling_rights;
     int halfmove_clock;
     int fullmove_counter;
-
+    KEY hash_key;
     void reset();
+};
+
+#define CAPTURES true
+#define ALLMOVES false
+
+class Board;
+
+using KEY = uint64_t;
+namespace zobrist {
+    inline std::array<KEY, 768> piece_keys; // 12 * 64
+    inline std::array<KEY, 4> castling_keys;
+    inline std::array<KEY, 8> ep_file_key;
+    inline KEY side_key;
+
+    void init_keys();
+    KEY gen_pos_key(Board_State& state);
+}
+
+class Board {
+private:
+    std::vector<Board_State> prev_states;
+    std::array<BB, 16> generate_move_targets();
+    Move generate_move_nopromo(Squares from_sq, Squares to_sq);
+    
+public:
+
+    Board_State state;
+    Move_List move_list;
+
+    Board() {
+        zobrist::init_keys();
+        state.reset();
+        prev_states.push_back(state);
+    }
+
+    Board(std::string fen) {
+        load_fen(fen);
+        prev_states.push_back(state);
+        zobrist::init_keys();
+    }
+
+    Board(int load_start) {
+        if (!load_start) return;
+
+        load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        prev_states.push_back(state);
+        zobrist::init_keys();
+    }
+
     void load_fen(std::string fen);
     void print_board();
+
+    template <bool GEN_CAPTURES>
+    void generate_moves();
+    void make_move(Move move);
+    void unmake_last_move();
+
+    bool is_draw();
+    bool is_over();
+    Colours winner();
 };
 
 #endif

@@ -1,0 +1,50 @@
+#include <random>
+#include "../include/board.h"
+#include <iostream>
+void zobrist::init_keys() {
+    std::mt19937_64 gen(KEY(34567)); 
+    std::uniform_int_distribution<KEY> dist(0, UINT64_MAX);
+
+    for (auto& key : piece_keys) {
+        key = dist(gen);
+    }
+
+    for (auto& key : castling_keys) {
+        key = dist(gen);
+    }
+
+    for (auto& key : ep_file_key) {
+        key = dist(gen);
+    }
+
+    side_key = dist(gen);
+}
+
+KEY zobrist::gen_pos_key(Board_State& state) {
+    KEY key = KEY(0);
+    for (int sq = 0; sq < 64; sq++) {
+        Pieces piece = state.piece_list.at(sq);
+        if (piece > 12)
+            continue;
+        key ^= piece_keys.at(piece * 64 + sq);
+    }
+
+    if (state.enpassant_square != no_square) {
+        int file = state.enpassant_square & 7;
+        key ^= ep_file_key.at(file);
+    }
+
+    if (state.castling_rights & wking_side)
+        key ^= castling_keys.at(0);
+    if (state.castling_rights & wqueen_side)
+        key ^= castling_keys.at(1);
+    if (state.castling_rights & bking_side)
+        key ^= castling_keys.at(2);
+    if (state.castling_rights & bqueen_side)
+        key ^= castling_keys.at(3);
+
+    if (state.side_to_move == black)
+        key ^= side_key;
+
+    return key;
+}

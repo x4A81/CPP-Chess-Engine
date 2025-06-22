@@ -3,60 +3,72 @@
 
 #include "board.h"
 
-#define AFILE 0x0101010101010101
-#define HFILE 0x8080808080808080
+#include <immintrin.h>
+#include <array>
 
-#define nAFILE ~AFILE
-#define nHFILE ~HFILE
+namespace bitboard_utils {
+    const BB AFILE = BB(0x0101010101010101);
+    const BB HFILE = BB(0x8080808080808080);
+    const BB ABFILE = BB(0x0303030303030303);
+    const BB GHFILE = BB(0xC0C0C0C0C0C0C0C0);
 
-/* Unused, for future SIMD code 
-example function that used SIMD:
+    const BB nAFILE = ~AFILE;
+    const BB nHFILE = BB(0x7F7F7F7F7F7F7F7F);
+    const BB nABFILE = ~ABFILE;
+    const BB nGHFILE = ~GHFILE;
 
-template <typename T>
+    enum Dir : int {
+        nort,
+        sout,
+        east,
+        west,
+        noEast,
+        noWest,
+        soEast,
+        soWest,
+        noNoEa,
+        noEaEa,
+        soEaEa,
+        soSoEa,
+        noNoWe,
+        noWeWe,
+        soWeWe,
+        soSoWe,
+    };
 
-inline north_shift(T bb) {
-    return (bb << 8);
-}
+    const std::array<BB, 8> avoid_wraps = { 
+        BB(0xFFFFFFFFFFFFFF00), BB(0x00FFFFFFFFFFFFFF), BB(0xFEFEFEFEFEFEFEFE), BB(0x7F7F7F7F7F7F7F7F), 
+        BB(0xFEFEFEFEFEFEFE00), BB(0x7F7F7F7F7F7F7F00), BB(0x00FEFEFEFEFEFEFE), BB(0x007F7F7F7F7F7F7F) 
+    };
 
-the function would be able to be used with both scalar and SIMD types.
+    const std::array<int, 16> shifts = { 8,  -8,  1,  -1,  9, 7,  -7,  -9,
+                                         17, 10, -6, -15, 15, 6, -10, -17 };
 
-BB bb = ...
-BB bb2 = ...
-
-BB scalar_result = north_shift(bb);
-XMM xmm_result = north_shift(XMM(bb2, bb2));
-
-*/
-
-#include <nmmintrin.h>
-
-class XMM {
-public:
-    __m128i x;
-    XMM() : x(_mm_setzero_si128()) {}
-    XMM(BB bb) : x(_mm_cvtsi64_si128(bb)) {}
-    XMM(BB hi, BB lo) : x(_mm_set_epi64x(hi, lo)) {}
-    XMM(__m128i a) : x(a) {}
-
-    XMM& operator >>= (int sh) { x = _mm_srli_epi64(x, sh); return *this; }
-    XMM& operator <<= (int sh) { x = _mm_slli_epi64(x, sh); return *this; }
-
-    XMM& operator &= (const XMM& a) { x = _mm_and_si128(x, a.x); return *this; }
-    XMM& operator |= (const XMM& a) { x = _mm_or_si128(x, a.x);  return *this; }
-    XMM& operator ^= (const XMM& a) { x = _mm_xor_si128(x, a.x); return *this; }
-
-    friend XMM operator >> (const XMM& a, int sh) { return XMM(_mm_srli_epi64(a.x, sh)); }
-    friend XMM operator << (const XMM& a, int sh) { return XMM(_mm_slli_epi64(a.x, sh)); }
-    friend XMM operator & (const XMM& a, const XMM& b) { return XMM(_mm_and_si128(a.x, b.x)); }
-    friend XMM operator | (const XMM& a, const XMM& b) { return XMM(_mm_or_si128(a.x, b.x)); }
-    friend XMM operator ^ (const XMM& a, const XMM& b) { return XMM(_mm_xor_si128(a.x, b.x)); }
-
-    BB lo() const { return _mm_cvtsi128_si64(x); }
-    BB hi() const { return _mm_extract_epi64(x, 1); }
-
-    XMM swapp() const {
-        return XMM(_mm_shuffle_epi32(x, _MM_SHUFFLE(1, 0, 3, 2)));
+    inline BB mask(int sq) { return (BB(1) << sq); }
+    inline void pop_bit(BB& bb, int sq) { bb &= ~mask(sq); }
+    inline void set_bit(BB& bb, int sq) { bb |= mask(sq); }
+    inline int get_bit(BB bb, int sq) { return (bb >> sq) & 1; }
+    inline int bitscan_forward(BB bb) { return static_cast<int>(_tzcnt_u64(bb)); }
+    
+    inline BB shift_one(BB bb, Dir dir) {
+        int s = shifts[dir];
+        return BB(_lrotl(bb, s)) & avoid_wraps[dir];
     }
-};
+
+    inline BB occ_fill(BB gen, BB pro, Dir dir) {
+        int s = shifts[dir];
+        pro &= avoid_wraps[dir];
+        gen |= pro & BB(_lrotl(gen, s));
+        pro &= BB(_lrotl(pro, s));
+        gen |= pro & BB(_lrotl(gen, s*2));
+        pro &= BB(_lrotl(pro, s*2));
+        gen |= pro & BB(_lrotl(gen, s*3));
+        return gen;
+    }
+
+    inline BB sliding_attacks(BB sliders, BB occ, Dir dir) {
+        return shift_one(occ_fill(sliders, ~occ, dir), dir);
+    }
+}
 
 #endif

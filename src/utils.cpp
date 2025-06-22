@@ -1,5 +1,5 @@
 #include "../include/utils.h"
-#include "utils.h"
+#include "../include/bitboard_utils.h"
 #include <iostream>
 
 char piece_to_char(Pieces piece) {
@@ -26,16 +26,39 @@ Pieces char_to_piece(char c) {
 }
 
 void print_bitboard(BB bb) {
-    printf("\nBitboard val: %lu \n", bb);
+    printf("\nBitboard val: 0x%lX\n", bb);
     for (int r = 7; r >= 0 ; r--) {
-        printf(" %d |", r+1);
+        std::cout << " " << r+1 << " |";
         for (int f = 0; f < 8; f++) {
             int sq = 8*r+f;
-            std::cout << " " << (get_bit(bb, static_cast<Squares>(sq)) ? 1 : 0) << " ";
+            std::cout << " " << (bitboard_utils::get_bit(bb, sq) ? 1 : 0) << " ";
         }
     
         std::cout << std::endl;
     }
   
     std::cout << "     a  b  c  d  e  f  g  h" << std::endl;
+}
+
+std::string sqauare_to_algebraic(Squares sq) {
+    char file = 'a' + (sq & 7);
+    char rank = '1' + (sq >> 3);
+    return std::string() + file + rank;
+}
+
+void print_move(Move move) {
+    int from_sq = move & 0b111111;
+    int to_sq = (move >> 6) & 0b111111;
+    std::cout << sqauare_to_algebraic(Squares(from_sq)) << sqauare_to_algebraic(Squares(to_sq));
+    int code = move >> 12;
+    switch (code) {
+        case 8:
+        case 12: std::cout << 'n';
+        case 9:
+        case 13: std::cout << 'b';
+        case 10:
+        case 14: std::cout << 'r';
+        case 11:
+        case 15: std::cout << 'q';
+    }
 }
