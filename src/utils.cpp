@@ -40,7 +40,21 @@ void print_bitboard(BB bb) {
     std::cout << "     a  b  c  d  e  f  g  h" << std::endl;
 }
 
-std::string sqauare_to_algebraic(Squares sq) {
+void print_piece_list(std::array<Pieces, 64> list) {
+    for (int r = 7; r >= 0 ; r--) {
+        std::cout << " " << r+1 << " |";
+        for (int f = 0; f < 8; f++) {
+            int sq = 8*r+f;
+            std::cout << " " << list.at(sq) << " ";
+        }
+    
+        std::cout << std::endl;
+    }
+  
+    std::cout << "     a  b  c  d  e  f  g  h" << std::endl;
+}
+
+std::string sqauare_to_string(Squares sq) {
     char file = 'a' + (sq & 7);
     char rank = '1' + (sq >> 3);
     return std::string() + file + rank;
@@ -49,7 +63,7 @@ std::string sqauare_to_algebraic(Squares sq) {
 void print_move(Move move) {
     int from_sq = move & 0b111111;
     int to_sq = (move >> 6) & 0b111111;
-    std::cout << sqauare_to_algebraic(Squares(from_sq)) << sqauare_to_algebraic(Squares(to_sq));
+    std::cout << sqauare_to_string(Squares(from_sq)) << sqauare_to_string(Squares(to_sq));
     int code = move >> 12;
     switch (code) {
         case 8:

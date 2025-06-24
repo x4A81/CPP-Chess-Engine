@@ -3,8 +3,10 @@
 
 #include "board.h"
 
-#include <immintrin.h>
 #include <array>
+#include <bit>
+
+using namespace std;
 
 namespace bitboard_utils {
     const BB AFILE = BB(0x0101010101010101);
@@ -48,21 +50,21 @@ namespace bitboard_utils {
     inline void pop_bit(BB& bb, int sq) { bb &= ~mask(sq); }
     inline void set_bit(BB& bb, int sq) { bb |= mask(sq); }
     inline int get_bit(BB bb, int sq) { return (bb >> sq) & 1; }
-    inline int bitscan_forward(BB bb) { return static_cast<int>(_tzcnt_u64(bb)); }
+    inline int bitscan_forward(BB bb) { return countr_zero(bb); }
     
     inline BB shift_one(BB bb, Dir dir) {
         int s = shifts[dir];
-        return BB(_lrotl(bb, s)) & avoid_wraps[dir];
+        return rotl(bb, s) & avoid_wraps[dir];
     }
 
     inline BB occ_fill(BB gen, BB pro, Dir dir) {
         int s = shifts[dir];
         pro &= avoid_wraps[dir];
-        gen |= pro & BB(_lrotl(gen, s));
-        pro &= BB(_lrotl(pro, s));
-        gen |= pro & BB(_lrotl(gen, s*2));
-        pro &= BB(_lrotl(pro, s*2));
-        gen |= pro & BB(_lrotl(gen, s*3));
+        gen |= pro & rotl(gen, s);
+        pro &= rotl(pro, s);
+        gen |= pro & rotl(gen, s*2);
+        pro &= rotl(pro, s*2);
+        gen |= pro & rotl(gen, s*3);
         return gen;
     }
 

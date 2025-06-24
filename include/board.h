@@ -7,9 +7,11 @@
 #include <stack>
 #include <vector>
 
+/// @brief Bitboard type
 using BB = uint64_t;
 
-// Little-Endian Rank-File Mapping
+// @brief encoded squares in 'Little-Endian Rank-File Mapping' format.
+// See https://www.chessprogramming.org/Square_Mapping_Considerations#Little-Endian_File-Rank_Mapping
 enum Squares : int {
     a1, b1, c1, d1, e1, f1, g1, h1,
     a2, b2, c2, d2, e2, f2, g2, h2,
@@ -105,6 +107,7 @@ struct Board_State {
     int halfmove_clock;
     int fullmove_counter;
     KEY hash_key;
+    Move_List move_list;
     void reset();
 };
 
@@ -127,13 +130,12 @@ namespace zobrist {
 class Board {
 private:
     std::vector<Board_State> prev_states;
-    std::array<BB, 16> generate_move_targets();
     Move generate_move_nopromo(Squares from_sq, Squares to_sq);
     
 public:
+    std::array<BB, 16> generate_move_targets();
 
     Board_State state;
-    Move_List move_list;
 
     Board() {
         zobrist::init_keys();
@@ -142,9 +144,9 @@ public:
     }
 
     Board(std::string fen) {
+        zobrist::init_keys();
         load_fen(fen);
         prev_states.push_back(state);
-        zobrist::init_keys();
     }
 
     Board(int load_start) {

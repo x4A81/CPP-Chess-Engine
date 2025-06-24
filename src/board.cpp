@@ -17,7 +17,7 @@ void Board_State::reset() {
     castling_rights = 0;
     halfmove_clock = 0;
     fullmove_counter = 1;
-    hash_key = KEY(0);
+    hash_key = 0;
 }
 
 
@@ -74,6 +74,8 @@ void Board::load_fen(string fen) {
     state.bitboards[13] = state.bitboards[P] | state.bitboards[N] | state.bitboards[B] |
                           state.bitboards[R] | state.bitboards[Q] | state.bitboards[K];
     state.bitboards[14] = state.bitboards[12] | state.bitboards[13];
+
+    state.hash_key = zobrist::gen_pos_key(state);
 }
 
 void Board::print_board() {
@@ -97,7 +99,7 @@ void Board::print_board() {
     cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
     cout << "Side to move: " << ((state.side_to_move == white) ? "White" : "Black") << endl;
     cout << "Castling rights: " << int(state.castling_rights) << endl;
-    cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : sqauare_to_algebraic(state.enpassant_square)) << endl;
+    cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : sqauare_to_string(state.enpassant_square)) << endl;
     cout << "Halfmove clock: " << state.halfmove_clock << endl;
     cout << "Fullmove counter: " << state.fullmove_counter << endl;
     cout << "Hash Key: " << state.hash_key << endl;
@@ -193,16 +195,16 @@ array<BB, 16> Board::generate_move_targets() {
         friend_queens = state.bitboards[q];
     }
 
-    BB hor_in_between = BB(0), ver_in_between = BB(0), dia_in_between = BB(0), ant_in_between = BB(0);
-    BB k_super_attacks_orth = BB(0), k_super_attacks_dia = BB(0), opp_any_attacks = BB(0);
+    BB hor_in_between = 0, ver_in_between = 0, dia_in_between = 0, ant_in_between = 0;
+    BB k_super_attacks_orth = 0, k_super_attacks_dia = 0, opp_any_attacks = 0;
 
     BB occ = state.bitboards[allpieces];
 
     /* Kogge-stone fill for black sliding attacks */
 
-    BB opp_attacks;
-    BB k_super_attacks;
-    BB occ_ex_king = occ ^ king_bb;
+    BB opp_attacks = 0;
+    BB k_super_attacks = 0;
+    BB occ_ex_king = ~occ ^ king_bb;
 
     // If there aren't any pieces to process, skip
     BB pieces = opp_rooks | opp_queens;
@@ -303,7 +305,7 @@ array<BB, 16> Board::generate_move_targets() {
     BB check_to = check_from | blocks | null_if_check;
     BB target_mask = ~friendly_pieces & check_to & null_if_DBl_check;
     
-    BB sliders;
+    BB sliders = 0;
 
     /* Sliding Pieces */
     pieces = friend_rooks | friend_queens;
@@ -345,7 +347,7 @@ array<BB, 16> Board::generate_move_targets() {
 
     // Pawn Captures including en passant
 
-    BB hor_between;
+    BB hor_between = 0;
     BB targets = (opp_pieces & target_mask);
     if (state.side_to_move == white) {
         
@@ -385,8 +387,8 @@ array<BB, 16> Board::generate_move_targets() {
         
     // Pawn Pushes
     pawns = friendly_pawns & ~(all_in_between ^ ver_in_between);
-    BB pawn_pushes;
-    BB dbl_rank;
+    BB pawn_pushes = 0;
+    BB dbl_rank = 0;
     
     if (pawns) {
         if (state.side_to_move == white) {
@@ -482,7 +484,7 @@ Move Board::generate_move_nopromo(Squares from_sq, Squares to_sq) {
 
 template <bool GEN_CAPTURES>
 void Board::generate_moves() {
-    move_list.clear();
+    state.move_list.clear();
     array<BB, 16> move_targets = generate_move_targets();
     for (int dir = nort; dir <= soWest; dir++) {
         if constexpr (GEN_CAPTURES)
@@ -506,10 +508,10 @@ void Board::generate_moves() {
             if (get_bit(move, 16)) {
                 for (int i = 8; i <= 11; i++) {
                     Move cmove = move | (i << 12);
-                    move_list.add(cmove);
+                    state.move_list.add(cmove);
                 }
             } else
-                move_list.add(move);
+                state.move_list.add(move);
         }
     }
 
@@ -522,7 +524,7 @@ void Board::generate_moves() {
             pop_bit(move_targets[dir], target);
             int from_sq = target - shifts[dir];
             Move move = generate_move_nopromo(Squares(from_sq), Squares(target));
-            move_list.add(move);
+            state.move_list.add(move);
         }
     }
 }
@@ -531,30 +533,36 @@ template void Board::generate_moves<CAPTURES>();
 template void Board::generate_moves<ALLMOVES>();
 
 void Board::make_move(Move move) {
+    prev_states.push_back(state);
     if (move == nullmove) {
         if (state.side_to_move == black) state.fullmove_counter++;
         state.side_to_move = state.side_to_move == black ? white : black;
         state.enpassant_square = no_square;
         state.halfmove_clock = 0;
         state.hash_key = zobrist::gen_pos_key(state);
-        prev_states.push_back(state);
         return;
     }
 
     Squares from_sq = Squares(move & 0b111111), to_sq = Squares((move >> 6) & 0b111111);
     Pieces piece = state.piece_list.at(from_sq);
+
+    if (piece > 12) {
+        print_piece_list(state.piece_list);
+    }
+
     int move_code = move >> 12;
 
     pop_bit(state.bitboards[piece], from_sq);
     state.piece_list[from_sq] = no_piece;
     set_bit(state.bitboards[piece], to_sq);
-    state.piece_list[to_sq] = piece;
-
+    
     if (move_code == capture || move_code >= npromo) {
         Pieces c_piece = state.piece_list.at(to_sq);
         pop_bit(state.bitboards[c_piece], to_sq); 
     }
-
+    
+    state.piece_list[to_sq] = piece;
+    
     if (move_code == epcapture) {
         if (state.side_to_move == white) {
             pop_bit(state.bitboards[p], state.enpassant_square - 8);
@@ -672,13 +680,12 @@ void Board::make_move(Move move) {
     state.bitboards[14] = state.bitboards[12] | state.bitboards[13];
 
     state.hash_key = zobrist::gen_pos_key(state);
-    prev_states.push_back(state);
 }
 
 void Board::unmake_last_move() {
     if (prev_states.size() > 1) {
-        prev_states.pop_back();
         state = prev_states.back();
+        prev_states.pop_back();
     }
 }
 
