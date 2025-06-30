@@ -1,5 +1,5 @@
 #include <random>
-#include "../include/board.h"
+#include "../include/board.hpp"
 #include <iostream>
 void zobrist::init_keys() {
     std::mt19937_64 gen(KEY(34567)); 

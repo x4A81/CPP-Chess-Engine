@@ -15,5 +15,11 @@ target_include_directories(Engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_compile_options(Engine PRIVATE
     $<$<CONFIG:Debug>:>
-    $<$<CONFIG:Release>:>
+    $<$<CONFIG:Release>: -march=native>
 )
+
+# cmake -S "path to CMakeLists.txt" -B build -DCMAKE_BUILD_TYPE=Debug
+# or
+# cmake -S "path to CMakeLists.txt" -B build -DCMAKE_BUILD_TYPE=Release
+# then
+# cmake --build build

@@ -1,7 +1,7 @@
 #ifndef UTILS_H_INCLUDE
 #define UTILS_H_INCLUDE
 
-#include "board.h"
+#include "board.hpp"
 #include <cstring>
 #include <cstdint>
 
@@ -30,7 +30,7 @@ void print_move(Move move);
 /// @brief Converts a square value in the Squares enum into pure coordinate notation
 /// @param sq 
 /// @return the notation of the square
-std::string sqauare_to_string(Squares sq);
+std::string square_to_string(Squares sq);
 
 /// @note For more on Pure coordinate notation, see https://www.chessprogramming.org/Algebraic_Chess_Notation#Pure_coordinate_notation
 

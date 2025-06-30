@@ -1,12 +1,12 @@
-#include "../include/board.h"
-#include "../include/utils.h"
-#include "../include/bitboard_utils.h"
+#include "../include/board.hpp"
+#include "../include/utils.hpp"
+#include "../include/misc.hpp"
 #include <iostream>
 #include <sstream>
 
 using namespace bitboard_utils;
+using namespace movegenerator;
 using namespace std;
-
 
 // Clears board flags and bitboards, then resets flags to defaults
 void Board_State::reset() {
@@ -99,434 +99,373 @@ void Board::print_board() {
     cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
     cout << "Side to move: " << ((state.side_to_move == white) ? "White" : "Black") << endl;
     cout << "Castling rights: " << int(state.castling_rights) << endl;
-    cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : sqauare_to_string(state.enpassant_square)) << endl;
+    cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : square_to_string(state.enpassant_square)) << endl;
     cout << "Halfmove clock: " << state.halfmove_clock << endl;
     cout << "Fullmove counter: " << state.fullmove_counter << endl;
     cout << "Hash Key: " << state.hash_key << endl;
 }
 
-/* Move gen code */
-
-// Non sliding pieces attacks by calculation
-inline BB knight_attacks(BB knights) {
-    BB l1 = (knights >> 1) & 0x7f7f7f7f7f7f7f7f;
-    BB l2 = (knights >> 2) & 0x3f3f3f3f3f3f3f3f;
-    BB r1 = (knights << 1) & 0xfefefefefefefefe;
-    BB r2 = (knights << 2) & 0xfcfcfcfcfcfcfcfc;
-    BB h1 = l1 | r1;
-    BB h2 = l2 | r2;
-    return (h1 << 16) | (h1 >> 16) | (h2 << 8) | (h2 >> 8);
-}
-
-inline BB wpawn_attacks(BB pawns) {
-    return ((pawns << 9) & nAFILE) | (pawns << 7) & nHFILE;
-}
-
-inline BB bpawn_attacks(BB pawns) {
-    return ((pawns >> 9) & nHFILE) | ((pawns >> 7) & nAFILE);
-}
-
-inline BB king_attacks(BB king) {
-    BB attacks = ((king >> 1) & nHFILE) | ((king << 1) & nAFILE);
-    king |= attacks;
-    attacks |= (king >> 8) | (king << 8);
-    return attacks;
-}
-
-inline BB knight_noNoEa(BB bb) { return (bb << 17) & nAFILE; }
-inline BB knight_noEaEa(BB bb) { return (bb << 10) & nABFILE; }
-inline BB knight_soEaEa(BB bb) { return (bb >>  6) & nABFILE; }
-inline BB knight_soSoEa(BB bb) { return (bb >> 15) & nAFILE; }
-inline BB knight_noNoWe(BB bb) { return (bb << 15) & nHFILE; }
-inline BB knight_noWeWe(BB bb) { return (bb <<  6) & nGHFILE; }
-inline BB knight_soWeWe(BB bb) { return (bb >> 10) & nGHFILE; }
-inline BB knight_soSoWe(BB bb) { return (bb >> 17) & nHFILE; }
-
-array<BB, 16> Board::generate_move_targets() {
-
-    array<BB, 16> move_targets;
-    move_targets.fill(BB(0));
-
-    
-    /* Dir golem algorithm */
-    
-    // The Opps
-
-    BB opp_pawns = state.bitboards[p];
-    BB opp_knights = state.bitboards[n];
-    BB opp_bishops = state.bitboards[b];
-    BB opp_rooks = state.bitboards[r];
-    BB opp_queens = state.bitboards[q];
-    BB opp_king = state.bitboards[k];
-
-    BB opp_pieces = opp_pawns | opp_knights |
-                        opp_bishops | opp_rooks |
-                        opp_queens | opp_king;
-
-    BB king_bb = state.bitboards[K];
-
-    BB friendly_pieces = state.bitboards[P] | state.bitboards[N] |
-                        state.bitboards[B] | state.bitboards[R] |
-                        state.bitboards[Q] | state.bitboards[K];
-
-    BB friendly_pawns = state.bitboards[P];
-    BB friend_knights = state.bitboards[N];
-    BB friend_rooks = state.bitboards[R];
-    BB friend_bishops = state.bitboards[B];
-    BB friend_queens = state.bitboards[Q];
-
-    if (state.side_to_move == black) {
-        opp_pawns = state.bitboards[P];
-        opp_knights = state.bitboards[N];
-        opp_bishops = state.bitboards[B];
-        opp_rooks = state.bitboards[R];
-        opp_queens = state.bitboards[Q];
-        opp_king = state.bitboards[K];
-        king_bb = state.bitboards[k];
-
-        friendly_pieces = state.bitboards[p] | state.bitboards[n] |
-                         state.bitboards[b] | state.bitboards[r] |
-                         state.bitboards[q] | state.bitboards[k];
-                         
-        friendly_pawns = state.bitboards[p];
-        friend_knights = state.bitboards[n];
-        friend_rooks = state.bitboards[r];
-        friend_bishops = state.bitboards[b];
-        friend_queens = state.bitboards[q];
-    }
-
-    BB hor_in_between = 0, ver_in_between = 0, dia_in_between = 0, ant_in_between = 0;
-    BB k_super_attacks_orth = 0, k_super_attacks_dia = 0, opp_any_attacks = 0;
-
-    BB occ = state.bitboards[allpieces];
-
-    /* Kogge-stone fill for black sliding attacks */
-
-    BB opp_attacks = 0;
-    BB k_super_attacks = 0;
-    BB occ_ex_king = ~occ ^ king_bb;
-
-    // If there aren't any pieces to process, skip
-    BB pieces = opp_rooks | opp_queens;
-    if (pieces) {
-        // Opp rooks and queens south atttacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, sout);
-        k_super_attacks = sliding_attacks(king_bb, occ, nort);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_orth |= k_super_attacks;
-        ver_in_between |= opp_attacks & k_super_attacks;
-    
-        // Opp rooks and queens north atttacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, nort);
-        k_super_attacks = sliding_attacks(king_bb, occ, sout);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_orth |= k_super_attacks;
-        ver_in_between |= opp_attacks & k_super_attacks;
-    
-        // Opp rooks and queens east atttacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, east);
-        k_super_attacks = sliding_attacks(king_bb, occ, west);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_orth |= k_super_attacks;
-        hor_in_between |= opp_attacks & k_super_attacks;
-    
-        // Opp rooks and queens west atttacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, west);
-        k_super_attacks = sliding_attacks(king_bb, occ, east);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_orth |= k_super_attacks;
-        hor_in_between |= opp_attacks & k_super_attacks;
-    }
-
-    pieces = opp_bishops | opp_queens;
-    if (pieces) {
-
-        // Opp bishops and queens south west attacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, soWest);
-        k_super_attacks = sliding_attacks(king_bb, occ, noEast);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_dia |= k_super_attacks;
-        dia_in_between |= opp_attacks & k_super_attacks;
-    
-        // Opp bishops and queens north east attacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, noEast);
-        k_super_attacks = sliding_attacks(king_bb, occ, noWest);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_dia |= k_super_attacks;
-        dia_in_between |= opp_attacks & k_super_attacks;
-    
-        // Opp bishops and queens north west attacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, noWest);
-        k_super_attacks = sliding_attacks(king_bb, occ, soEast);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_dia |= k_super_attacks;
-        ant_in_between |= opp_attacks & k_super_attacks;
-    
-        // Opp bishops and queens south east attacks
-        opp_attacks = sliding_attacks(pieces, occ_ex_king, soEast);
-        k_super_attacks = sliding_attacks(king_bb, occ, noWest);
-        opp_any_attacks |= opp_attacks;
-        k_super_attacks_dia |= k_super_attacks;
-        ant_in_between |= opp_attacks & k_super_attacks;
-    }
-
-    /* Non Sliding Pieces */
-
-    // Opp knight attacks
-
-    opp_any_attacks |= knight_attacks(opp_knights);
-
-    // Opp pawn attacks
-
-    if (state.side_to_move == white) {
-        opp_any_attacks |= bpawn_attacks(opp_pawns);
-    } else
-        opp_any_attacks |= wpawn_attacks(opp_pawns);
-
-    // Opp king attacks
-
-    opp_any_attacks |= king_attacks(opp_king);
-
-    /* Generating Moves */
-    
-    BB all_in_between = hor_in_between | ver_in_between | dia_in_between | ant_in_between;
-
-    /* Handle Check */
-
-    BB blocks = all_in_between & ~occ;
-    BB check_from = (k_super_attacks_orth & (opp_rooks | opp_queens))
-                    | (k_super_attacks_dia & (opp_bishops | opp_queens))
-                    | (knight_attacks(king_bb) & opp_knights)
-                    | ((state.side_to_move == white) ? (wpawn_attacks(king_bb) & opp_pawns) : (bpawn_attacks(king_bb) & opp_pawns));
-
-    int64_t null_if_check = (int64_t(opp_any_attacks & king_bb) - 1) >> 63;
-    int64_t null_if_DBl_check = (int64_t(check_from & (check_from-1)) - 1) >> 63;
-
-    BB check_to = check_from | blocks | null_if_check;
-    BB target_mask = ~friendly_pieces & check_to & null_if_DBl_check;
-    
-    BB sliders = 0;
-
-    /* Sliding Pieces */
-    pieces = friend_rooks | friend_queens;
-    if (pieces) {
-        sliders = (friend_rooks | friend_queens) & ~(all_in_between ^ hor_in_between);
-        move_targets[east] |= sliding_attacks(sliders, occ, east) & target_mask;
-        move_targets[west] |= sliding_attacks(sliders, occ, west) & target_mask;
-        
-        sliders = (friend_rooks | friend_queens) & ~(all_in_between ^ ver_in_between);
-        move_targets[nort] |= sliding_attacks(sliders, occ, nort) & target_mask;
-        move_targets[sout] |= sliding_attacks(sliders, occ, sout) & target_mask;
-    }
-
-    pieces = friend_bishops | friend_queens;
-    if (pieces) {
-        sliders = (friend_bishops | friend_queens) & ~(all_in_between ^ dia_in_between);
-        move_targets[soWest] |= sliding_attacks(sliders, occ, soWest) & target_mask;
-        move_targets[noEast] |= sliding_attacks(sliders, occ, noEast) & target_mask;
-    
-        sliders = (friend_bishops | friend_queens) & ~(all_in_between ^ ant_in_between);
-        move_targets[soEast] |= sliding_attacks(sliders, occ, soEast) & target_mask;
-        move_targets[noWest] |= sliding_attacks(sliders, occ, noWest) & target_mask;
-    }
-
-    /* Non Sliding Pieces */
-
-    // Knights
-    BB knights = friend_knights & ~all_in_between;
-    if (knights) {
-        move_targets[noNoEa] = knight_noNoEa(knights) & target_mask;
-        move_targets[noEaEa] = knight_noEaEa(knights) & target_mask;
-        move_targets[soEaEa] = knight_soEaEa(knights) & target_mask;
-        move_targets[soSoEa] = knight_soSoEa(knights) & target_mask;
-        move_targets[noNoWe] = knight_noNoWe(knights) & target_mask;
-        move_targets[noWeWe] = knight_noWeWe(knights) & target_mask;   
-        move_targets[soWeWe] = knight_soWeWe(knights) & target_mask;
-        move_targets[soSoWe] = knight_soSoWe(knights) & target_mask;
-    }
-
-    // Pawn Captures including en passant
-
-    BB hor_between = 0;
-    BB targets = (opp_pieces & target_mask);
-    if (state.side_to_move == white) {
-        
-        if (state.enpassant_square != no_square && null_if_check) {
-            BB c_occ = occ & ~mask(state.enpassant_square + 8);
-            set_bit(c_occ, state.enpassant_square);
-            hor_between = sliding_attacks(king_bb, occ, east) | sliding_attacks(king_bb, occ, west);
-            if (!(hor_between & friendly_pawns))
-            set_bit(targets, state.enpassant_square);
-        }
-        
-    } else {
-        if (state.enpassant_square != no_square && null_if_check) {
-            BB c_occ = occ & ~mask(state.enpassant_square - 8);
-            set_bit(c_occ, state.enpassant_square);
-            hor_between = sliding_attacks(king_bb, occ, east) | sliding_attacks(king_bb, occ, west);
-            if (!(hor_between & friendly_pawns))
-            set_bit(targets, state.enpassant_square);
-        }
-    }
-
-    BB pawns = friendly_pawns & ~(all_in_between ^ dia_in_between);
-    if (pawns) {
-        if (state.side_to_move == white)
-            move_targets[noEast] |= shift_one(pawns, noEast) & targets;
-        else
-            move_targets[soWest] |= shift_one(pawns, soWest) & targets;
-    }
-
-    pawns = friendly_pawns & ~(all_in_between ^ ant_in_between);
-    if (pawns) {
-        if (state.side_to_move == white)
-            move_targets[noWest] |= shift_one(pawns, noWest) & targets;
-        else
-            move_targets[soEast] |= shift_one(pawns, noEast) & targets;
-    }
-        
-    // Pawn Pushes
-    pawns = friendly_pawns & ~(all_in_between ^ ver_in_between);
-    BB pawn_pushes = 0;
-    BB dbl_rank = 0;
-    
-    if (pawns) {
-        if (state.side_to_move == white) {
-            pawn_pushes = (pawns << 8) & ~occ;
-            move_targets[nort] |= pawn_pushes & target_mask;
-            dbl_rank= 0x00000000FF000000ULL;
-            move_targets[nort] |= (pawn_pushes << 8) & ~occ & target_mask & dbl_rank;
-            
-        } else {
-            pawn_pushes |= (pawns >> 8) & ~occ;
-            move_targets[sout] |= pawn_pushes & target_mask;
-            dbl_rank = 0x000000FF00000000ULL;
-            move_targets[sout] |= (pawn_pushes >> 8) & ~occ & target_mask & dbl_rank;
-        }
-    }
-
-    // King Moves
-    target_mask = ~(friendly_pieces | opp_any_attacks);
-    move_targets[west] |= ((king_bb << 1) & nHFILE) & target_mask;
-    move_targets[east] |= ((king_bb >> 1) & nAFILE) & target_mask;
-    move_targets[nort] |= ((king_bb << 8) & target_mask);
-    move_targets[sout] |= ((king_bb >> 8) & target_mask);
-    move_targets[noEast] |= ((king_bb << 9) & nAFILE) & target_mask;
-    move_targets[noWest] |= ((king_bb << 7) & nHFILE) & target_mask;
-    move_targets[soEast] |= ((king_bb >> 7) & nAFILE) & target_mask;
-    move_targets[soWest] |= ((king_bb >> 9) & nHFILE) & target_mask;
-
-    // Castling
-    if (null_if_check) {
-        if (state.side_to_move == white) {
-            if (state.castling_rights & wking_side) {
-                // Check if blocked or attacked
-                if (state.piece_list[f1] == no_piece && state.piece_list[g1] == no_piece
-                && ~(opp_any_attacks & mask(f1)) && ~(opp_any_attacks & mask(g1)))
-
-                    move_targets[east] |= mask(g1);
-
-            } else if (state.castling_rights & wqueen_side) {
-                // Check if blocked or attacked
-                if (state.piece_list[d1] == no_piece && state.piece_list[c1] == no_piece && state.piece_list[b1] == no_piece
-                && ~(opp_any_attacks & mask(d1)) && ~(opp_any_attacks & mask(c1)))
-                
-                    move_targets[west] |= mask(c1);
-            }
-        } else {
-            if (state.castling_rights & bking_side) {
-                // Check if blocked or attacked
-                if (state.piece_list[f8] == no_piece && state.piece_list[g8] == no_piece
-                && ~(opp_any_attacks & mask(f8)) && ~(opp_any_attacks & mask(g8)))
-
-                    move_targets[east] |= mask(g8);
-
-            } else if (state.castling_rights & bqueen_side) {
-                // Check if blocked or attacked
-                if (state.piece_list[d8] == no_piece && state.piece_list[c8] == no_piece && state.piece_list[b8] == no_piece
-                && ~(opp_any_attacks & mask(d8)) && ~(opp_any_attacks & mask(c8)))
-
-                    move_targets[west] |= mask(c8);
-            }
-        }
-    }
-
-    return move_targets;
-}
-
-Move Board::generate_move_nopromo(Squares from_sq, Squares to_sq) {
+Move Board::generate_move_nopromo(int from_sq, int to_sq) {
     Move move = from_sq | (to_sq << 6);
     int code = 0;
     bool is_pawn = (state.piece_list[from_sq] == P || state.piece_list[from_sq] == p);
     
     if (is_pawn && (to_sq - from_sq == 16 || to_sq - from_sq == -16))
-        code = 1;
+        code = dbpush;
 
-    if (state.piece_list[from_sq] == K || state.piece_list[from_sq] == k) {
-        if (to_sq == g1 || to_sq == g8)
-            code = 2;
-        if (to_sq == c1 || to_sq == c8)
-            code = 3;
+    if (state.piece_list[from_sq] == K && from_sq == e1) {
+        if (to_sq == g1) code = kcastle;
+        if (to_sq == c1) code = qcastle;
+    }
+
+    if (state.piece_list[from_sq] == k && from_sq == e8) {
+        if (to_sq == g8) code = kcastle;
+        if (to_sq == c8) code = qcastle;
     }
 
     if (state.piece_list[to_sq] != no_piece)
-        code = 4;
+        code = capture;
 
-    if (to_sq == state.enpassant_square && is_pawn)
-        code = 5;
-
-    if ((state.piece_list[from_sq] == P && to_sq > 55) || (state.piece_list[from_sq] == p && to_sq < 8))
-        code |= 8;
+    if ((to_sq == state.enpassant_square) && is_pawn)
+        code = epcapture;
 
     return move | (code << 12);
     
 }
 
+// Non sliding pieces attacks by calculation
+
 template <bool GEN_CAPTURES>
 void Board::generate_moves() {
+
+    // Handle the movement mask
+    BB move_mask = ~0;
+    BB white_mask = -(state.side_to_move == white); // All 1s if white to move, else 0s
+    BB black_mask = ~white_mask;
+
+    BB wh = state.bitboards[wpieces];
+    BB bl = state.bitboards[bpieces];
+    BB occ = state.bitboards[allpieces];
+
+    BB opponent_pieces = (bl & white_mask) | (wh & black_mask); // isolates opponent pieces
+
+    if constexpr (GEN_CAPTURES)
+        move_mask = opponent_pieces;
+
+    // Check mask
+    BB friendly_pieces = (bl & black_mask) | (wh & white_mask);
+    BB check_mask = ~0;
+    BB hor_inbetween = 0, ver_inbetween = 0, dia_inbetween = 0, antdia_inbetween = 0;
+    BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
+    BB opp_any_attacks = 0;
+    int king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
+    BB king_super_dia = bishop_moves(king_sq, occ);
+    BB king_super_orth = rook_moves(king_sq, occ);
+    BB kingBB = mask(king_sq);
+    BB opp_attacks = 0;
+    BB king_super = 0;
+
+    BB opp_rooks = (state.bitboards[r] | state.bitboards[R] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
+    
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, west);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, east);
+    hor_inbetween |= opp_attacks & king_super;
+
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, east);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, west);
+    hor_inbetween |= opp_attacks & king_super;
+
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, nort);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, sout);
+    ver_inbetween |= opp_attacks & king_super;
+
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, sout);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, nort);
+    ver_inbetween |= opp_attacks & king_super;
+    
+    BB opp_bishops = (state.bitboards[b] | state.bitboards[B] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
+    
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, noEast);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, soWest);
+    dia_inbetween |= opp_attacks & king_super;
+
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, soWest);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, noEast);
+    dia_inbetween |= opp_attacks & king_super;
+
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, soEast);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, noWest);
+    antdia_inbetween |= opp_attacks & king_super;
+
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, noWest);
+    opp_any_attacks |= opp_attacks;
+    king_super = sliding_attacks(kingBB, occ, soEast);
+    antdia_inbetween |= opp_attacks & king_super;
+
+    // Non-sliding pieces
+    opp_any_attacks |= knight_attacks((state.bitboards[n] | state.bitboards[N]) & opponent_pieces);
+
+    if (state.side_to_move == white)
+        opp_any_attacks |= bpawn_attacks(state.bitboards[p]);
+    else
+        opp_any_attacks |= wpawn_attacks(state.bitboards[P]);
+
+    
+    BB all_inbetween = hor_inbetween | ver_inbetween | antdia_inbetween | dia_inbetween;
+    BB block_mask = all_inbetween & ~occ;
+    BB checkers_mask = (king_super_orth & opp_rooks) | (king_super_dia & opp_bishops) 
+    | (knight_move_table[king_sq] & (state.bitboards[n] | state.bitboards[N]) & opponent_pieces)
+    | (pawn_attack_table[king_sq][state.side_to_move] & (state.bitboards[p] | state.bitboards[P]) & opponent_pieces);
+
+    int64_t null_if_check = (int64_t(opp_any_attacks & mask(king_sq)) - 1) >> 63;
+    int64_t null_if_dbl_check = (int64_t(checkers_mask & (checkers_mask - 1)) - 1) >> 63;
+
+    BB to_checkers_mask = checkers_mask | block_mask | null_if_check;
+    move_mask &= ~friendly_pieces & to_checkers_mask & null_if_dbl_check;
     state.move_list.clear();
-    array<BB, 16> move_targets = generate_move_targets();
-    for (int dir = nort; dir <= soWest; dir++) {
-        if constexpr (GEN_CAPTURES)
-            move_targets[dir] &= state.bitboards[allpieces] | mask(state.enpassant_square);
-        
-        while (move_targets[dir]) {
-            int target = bitscan_forward(move_targets[dir]);
-            pop_bit(move_targets[dir], target);
+    
+    BB king_movement = king_move_table[king_sq] & ~(friendly_pieces | opp_any_attacks);
 
-            int from_sq = target - shifts[dir];
-            while (state.piece_list.at(from_sq) == no_piece) {
-                from_sq -= shifts[dir];
-            }
+    while (king_movement) {
+        int to_sq = pop_lsb(king_movement);
+        state.move_list.add(generate_move_nopromo(king_sq, to_sq));
+    }
+    
+    // If dbl check only king moves are allowed
+    if (move_mask == 0) return;
+    
+    // Pinned knights cannot move
+    BB knights = (state.bitboards[n] | state.bitboards[N]) & friendly_pieces & ~all_inbetween;
+    while (knights) {
+        int from_sq = pop_lsb(knights);
+        BB movement = knight_move_table[from_sq] & move_mask;
+        while (movement) {
+            int to_sq = pop_lsb(movement);
+            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        }
+    }
 
-            if constexpr (GEN_CAPTURES) {
-                if (target == state.enpassant_square && !(state.piece_list[from_sq] == p || state.piece_list[from_sq] == P))
-                    continue;
-            }
+    // Rook and Queen moves
+    BB rooks = (state.bitboards[r] | state.bitboards[R] | state.bitboards[q] | state.bitboards[Q]) & friendly_pieces;
 
-            Move move = generate_move_nopromo(Squares(from_sq), Squares(target));
-            if (get_bit(move, 16)) {
-                for (int i = 8; i <= 11; i++) {
-                    Move cmove = move | (i << 12);
-                    state.move_list.add(cmove);
-                }
+    // horizontal
+    BB sliders = rooks & ~(all_inbetween ^ hor_inbetween);
+    while (sliders) {
+        int from_sq = pop_lsb(sliders);
+
+        BB slider_movement = rook_moves(from_sq, occ) & move_mask & hor_fill(from_sq);
+        while (slider_movement) {
+            int to_sq = pop_lsb(slider_movement);
+            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        }
+    }
+
+    // vertical
+    sliders = rooks & ~(all_inbetween ^ ver_inbetween);
+    while (sliders) {
+        int from_sq = pop_lsb(sliders);
+
+        BB slider_movement = rook_moves(from_sq, occ) & move_mask & ver_fill(from_sq);
+        while (slider_movement) {
+            int to_sq = pop_lsb(slider_movement);
+            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        }
+    }
+
+    // Queen and bishop moves
+    BB bishops = (state.bitboards[b] | state.bitboards[B] | state.bitboards[q] | state.bitboards[Q]) & friendly_pieces;
+
+    // Diagonal
+    sliders = bishops & ~(all_inbetween ^ dia_inbetween);
+    while (sliders) {
+        int from_sq = pop_lsb(sliders);
+
+        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & dia_fill(from_sq);
+        while (slider_movement) {
+            int to_sq = pop_lsb(slider_movement);
+            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        }
+    }
+
+    // Antidiagonal
+    sliders = bishops & ~(all_inbetween ^ antdia_inbetween);
+    while (sliders) {
+        int from_sq = pop_lsb(sliders);
+
+        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & antdia_fill(from_sq);
+        while (slider_movement) {
+            int to_sq = pop_lsb(slider_movement);
+            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        }
+    }
+
+    // Pawn Moves
+    BB pawns = (state.bitboards[p] | state.bitboards[P]) & friendly_pieces  & ~(all_inbetween ^ ver_inbetween);
+    BB pawn_push_mask = shift_one(pawns, Dir(int(sout) ^ state.side_to_move)) & ~occ;
+    BB rank4 = 0x00000000FF000000ULL;
+    BB rank5 = 0x000000FF00000000ULL;
+    BB dbl_rank = (state.side_to_move == white) ? rank4 : rank5;
+    while (pawns) {
+        int from_sq = pop_lsb(pawns);
+
+        // Single push
+        int to_sq = from_sq + shifts[state.side_to_move ^ 1];
+        if (get_bit(pawn_push_mask & move_mask, to_sq)) {
+            if (to_sq >= a8 || to_sq <= h1) {
+                Move move_no_promo = generate_move_nopromo(from_sq, to_sq);
+                state.move_list.add((npromo << 12) | move_no_promo);
+                state.move_list.add((bpromo << 12) | move_no_promo);
+                state.move_list.add((rpromo << 12) | move_no_promo);
+                state.move_list.add((qpromo << 12) | move_no_promo);
             } else
-                state.move_list.add(move);
+                state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        }
+
+        // Dbl push
+        to_sq += shifts[state.side_to_move ^ 1];
+        if (get_bit(shift_one(pawn_push_mask, Dir(int(sout) ^ state.side_to_move)) & dbl_rank & ~occ & move_mask, to_sq))
+            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+    }
+
+    // Attacks
+    BB targets = (opponent_pieces & move_mask) | mask(state.enpassant_square);
+    pawns = (state.bitboards[p] | state.bitboards[P]) & friendly_pieces;
+
+    BB attacking = pawns & ~(all_inbetween ^ dia_inbetween);
+    while (attacking) {
+        int from_sq = pop_lsb(attacking);
+
+        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & dia_fill(from_sq);
+        while (movement_mask) {
+            int to_sq = pop_lsb(movement_mask);
+
+            if (to_sq == state.enpassant_square) {
+                if (null_if_check) {
+                    BB c_occ = occ;
+                    pop_bit(c_occ, from_sq);
+                    pop_bit(c_occ, (state.side_to_move == white ? to_sq - 8 : to_sq + 8));
+                    if (hor_fill(king_sq) & rook_moves(king_sq, c_occ) & opp_rooks) {
+                        // enpassant is not legal
+                        continue;
+                    }
+                } else
+                    if (!(mask(state.enpassant_square + (state.side_to_move == white ? -8 : 8)) & to_checkers_mask)
+                    && !(mask(state.enpassant_square) & to_checkers_mask)) continue;
+            }
+
+            if (to_sq >= a8 || to_sq <= h1) {
+                Move move_no_promo = generate_move_nopromo(from_sq, to_sq);
+                state.move_list.add((c_npromo << 12) | move_no_promo);
+                state.move_list.add((c_bpromo << 12) | move_no_promo);
+                state.move_list.add((c_rpromo << 12) | move_no_promo);
+                state.move_list.add((c_qpromo << 12) | move_no_promo);
+            } else
+                state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
 
-    for (int dir = noNoEa; dir <= soSoWe; dir++) {
-        if constexpr (GEN_CAPTURES)
-            move_targets[dir] &= state.bitboards[allpieces];
-        
-        while (move_targets[dir]) {
-            int target = bitscan_forward(move_targets[dir]);
-            pop_bit(move_targets[dir], target);
-            int from_sq = target - shifts[dir];
-            Move move = generate_move_nopromo(Squares(from_sq), Squares(target));
-            state.move_list.add(move);
+    attacking = pawns & ~(all_inbetween ^ antdia_inbetween);
+    while (attacking) {
+        int from_sq = pop_lsb(attacking);
+
+        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & antdia_fill(from_sq);
+        while (movement_mask) {
+            int to_sq = pop_lsb(movement_mask);
+
+            if (to_sq == state.enpassant_square) {
+                if (null_if_check) {
+                    BB c_occ = occ;
+                    pop_bit(c_occ, from_sq);
+                    pop_bit(c_occ, (state.side_to_move == white ? to_sq - 8 : to_sq + 8));
+                    if (hor_fill(king_sq) & rook_moves(king_sq, c_occ) & opp_rooks) {
+                        // enpassant is not legal
+                        continue;
+                    }
+                } else
+                    if (!(mask(state.enpassant_square + (state.side_to_move == white ? -8 : 8)) & to_checkers_mask)
+                    && !(mask(state.enpassant_square) & to_checkers_mask)) continue;
+            }
+
+            if (to_sq >= a8 || to_sq <= h1) {
+                Move move_no_promo = generate_move_nopromo(from_sq, to_sq);
+                state.move_list.add((c_npromo << 12) | move_no_promo);
+                state.move_list.add((c_bpromo << 12) | move_no_promo);
+                state.move_list.add((c_rpromo << 12) | move_no_promo);
+                state.move_list.add((c_qpromo << 12) | move_no_promo);
+            } else
+                state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
+
+    // Caslting
+    if (null_if_check) {
+        if (state.side_to_move == white) {
+            if (
+                // Can castle
+                (state.castling_rights & wking_side)
+                
+                // Squares king travel aren't attacked
+                && !(get_bit(opp_any_attacks, f1) || get_bit(opp_any_attacks, g1))
+                
+                // There are no pieces between king & rook
+                
+                && !(get_bit(occ, f1) || get_bit(occ, g1))
+                
+            )
+            state.move_list.add(generate_move_nopromo(e1, g1));
+
+            if (
+                // Can castle
+                (state.castling_rights & wqueen_side)
+
+                // Squares king travel aren't attacked
+                && !(get_bit(opp_any_attacks, d1) || get_bit(opp_any_attacks, c1))
+
+                // There are no pieces between king & rook
+
+                && !(get_bit(occ, d1) || get_bit(occ, c1) || get_bit(occ, b1))
+            
+            )
+            state.move_list.add(generate_move_nopromo(e1, c1));
+
+        } else {
+            if (
+                // Can castle
+                (state.castling_rights & bking_side)
+
+                // Squares king travel aren't attacked
+                && !(get_bit(opp_any_attacks, f8) || get_bit(opp_any_attacks, g8))
+
+                // There are no pieces between king & rook
+
+                && !(get_bit(occ, f8) || get_bit(occ, g8))
+            
+            )
+            state.move_list.add(generate_move_nopromo(e8, g8));
+
+            if (
+                // Can castle
+                (state.castling_rights & bqueen_side)
+
+                // Squares king travel aren't attacked
+                && !(get_bit(opp_any_attacks, d8) || get_bit(opp_any_attacks, c8))
+
+                // There are no pieces between king & rook
+
+                && !(get_bit(occ, d8) || get_bit(occ, c8) || get_bit(occ, b8))
+            
+            )
+            state.move_list.add(generate_move_nopromo(e8, c8));
+        }
+    }
+
 }
 
 template void Board::generate_moves<CAPTURES>();
@@ -546,17 +485,13 @@ void Board::make_move(Move move) {
     Squares from_sq = Squares(move & 0b111111), to_sq = Squares((move >> 6) & 0b111111);
     Pieces piece = state.piece_list.at(from_sq);
 
-    if (piece > 12) {
-        print_piece_list(state.piece_list);
-    }
-
     int move_code = move >> 12;
 
     pop_bit(state.bitboards[piece], from_sq);
     state.piece_list[from_sq] = no_piece;
     set_bit(state.bitboards[piece], to_sq);
     
-    if (move_code == capture || move_code >= npromo) {
+    if (move_code == capture || move_code >= c_npromo) {
         Pieces c_piece = state.piece_list.at(to_sq);
         pop_bit(state.bitboards[c_piece], to_sq); 
     }
@@ -568,7 +503,7 @@ void Board::make_move(Move move) {
             pop_bit(state.bitboards[p], state.enpassant_square - 8);
             state.piece_list[state.enpassant_square - 8] = no_piece;
         } else {
-            pop_bit(state.bitboards[p], state.enpassant_square + 8);
+            pop_bit(state.bitboards[P], state.enpassant_square + 8);
             state.piece_list[state.enpassant_square + 8] = no_piece;
         }
     }

@@ -1,11 +1,15 @@
 #ifndef BOARD_H_INCLUDE
 #define BOARD_H_INCLUDE
 
+#include "misc.hpp"
 #include <cstdint>
 #include <string>
 #include <array>
 #include <stack>
 #include <vector>
+
+#define CAPTURES true
+#define ALLMOVES false
 
 /// @brief Bitboard type
 using BB = uint64_t;
@@ -71,7 +75,7 @@ enum Castling_Rights : int {
 /// 13   | 1     | 1    | 0         | 1    | bishop promo capt
 /// 14   | 1     | 1    | 1         | 0    | rook promo capt
 /// 15   | 1     | 1    | 1         | 1    | queen promo capt
-using Move = int16_t;
+using Move = uint16_t;
 #define nullmove 0
 
 enum Move_Code : int {
@@ -111,9 +115,6 @@ struct Board_State {
     void reset();
 };
 
-#define CAPTURES true
-#define ALLMOVES false
-
 class Board;
 
 using KEY = uint64_t;
@@ -130,20 +131,21 @@ namespace zobrist {
 class Board {
 private:
     std::vector<Board_State> prev_states;
-    Move generate_move_nopromo(Squares from_sq, Squares to_sq);
+    Move generate_move_nopromo(int from_sq, int to_sq);
     
 public:
-    std::array<BB, 16> generate_move_targets();
 
     Board_State state;
 
     Board() {
+        movegenerator::init_sliding_move_tables();
         zobrist::init_keys();
         state.reset();
         prev_states.push_back(state);
     }
 
     Board(std::string fen) {
+        movegenerator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen(fen);
         prev_states.push_back(state);
@@ -151,7 +153,7 @@ public:
 
     Board(int load_start) {
         if (!load_start) return;
-
+        movegenerator::init_sliding_move_tables();
         load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         prev_states.push_back(state);
         zobrist::init_keys();
