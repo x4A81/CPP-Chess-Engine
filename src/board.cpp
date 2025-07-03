@@ -5,7 +5,7 @@
 #include <sstream>
 
 using namespace bitboard_utils;
-using namespace movegenerator;
+using namespace move_generator;
 using namespace std;
 
 // Clears board flags and bitboards, then resets flags to defaults
@@ -19,7 +19,6 @@ void Board_State::reset() {
     fullmove_counter = 1;
     hash_key = 0;
 }
-
 
 void Board::load_fen(string fen) {
     state.reset();
@@ -154,7 +153,6 @@ void Board::generate_moves() {
 
     // Check mask
     BB friendly_pieces = (bl & black_mask) | (wh & white_mask);
-    BB check_mask = ~0;
     BB hor_inbetween = 0, ver_inbetween = 0, dia_inbetween = 0, antdia_inbetween = 0;
     BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
     BB opp_any_attacks = 0;
@@ -232,7 +230,7 @@ void Board::generate_moves() {
     state.move_list.clear();
     
     BB king_movement = king_move_table[king_sq] & ~(friendly_pieces | opp_any_attacks);
-
+    if constexpr (GEN_CAPTURES) king_movement &= opponent_pieces;
     while (king_movement) {
         int to_sq = pop_lsb(king_movement);
         state.move_list.add(generate_move_nopromo(king_sq, to_sq));
@@ -316,7 +314,7 @@ void Board::generate_moves() {
         int from_sq = pop_lsb(pawns);
 
         // Single push
-        int to_sq = from_sq + shifts[state.side_to_move ^ 1];
+        int to_sq = from_sq - shifts[state.side_to_move];
         if (get_bit(pawn_push_mask & move_mask, to_sq)) {
             if (to_sq >= a8 || to_sq <= h1) {
                 Move move_no_promo = generate_move_nopromo(from_sq, to_sq);
@@ -473,148 +471,141 @@ template void Board::generate_moves<ALLMOVES>();
 
 void Board::make_move(Move move) {
     prev_states.push_back(state);
+    KEY& key = state.hash_key;
+
     if (move == nullmove) {
         if (state.side_to_move == black) state.fullmove_counter++;
-        state.side_to_move = state.side_to_move == black ? white : black;
+        state.side_to_move = Colours(int(state.side_to_move) ^ 1);
+        key ^= zobrist::side_key;
         state.enpassant_square = no_square;
         state.halfmove_clock = 0;
-        state.hash_key = zobrist::gen_pos_key(state);
         return;
     }
 
     Squares from_sq = Squares(move & 0b111111), to_sq = Squares((move >> 6) & 0b111111);
-    Pieces piece = state.piece_list.at(from_sq);
-
+    Pieces piece = state.piece_list[from_sq];
     int move_code = move >> 12;
 
+    // Remove piece from source
     pop_bit(state.bitboards[piece], from_sq);
+    key ^= zobrist::piece_keys[piece * 64 + from_sq];
     state.piece_list[from_sq] = no_piece;
-    set_bit(state.bitboards[piece], to_sq);
-    
+
+    // Handle captures
     if (move_code == capture || move_code >= c_npromo) {
-        Pieces c_piece = state.piece_list.at(to_sq);
-        pop_bit(state.bitboards[c_piece], to_sq); 
+        Pieces c_piece = state.piece_list[to_sq];
+        pop_bit(state.bitboards[c_piece], to_sq);
+        key ^= zobrist::piece_keys[c_piece * 64 + to_sq];
     }
-    
-    state.piece_list[to_sq] = piece;
-    
+
+    // Handle en passant
     if (move_code == epcapture) {
-        if (state.side_to_move == white) {
-            pop_bit(state.bitboards[p], state.enpassant_square - 8);
-            state.piece_list[state.enpassant_square - 8] = no_piece;
-        } else {
-            pop_bit(state.bitboards[P], state.enpassant_square + 8);
-            state.piece_list[state.enpassant_square + 8] = no_piece;
-        }
+        int cap_sq = state.side_to_move == white ? state.enpassant_square - 8 : state.enpassant_square + 8;
+        Pieces cap_piece = state.side_to_move == white ? p : P;
+        pop_bit(state.bitboards[cap_piece], cap_sq);
+        state.piece_list[cap_sq] = no_piece;
+        key ^= zobrist::piece_keys[cap_piece * 64 + cap_sq];
     }
 
-    if (move_code >= npromo)
+    // Move piece to destination
+    set_bit(state.bitboards[piece], to_sq);
+    key ^= zobrist::piece_keys[piece * 64 + to_sq];
+    state.piece_list[to_sq] = piece;
+
+    // Promotions
+    if (move_code >= npromo) {
         pop_bit(state.bitboards[piece], to_sq);
+        key ^= zobrist::piece_keys[piece * 64 + to_sq];
 
-    if (move_code == npromo || move_code == c_npromo) {
+        Pieces promo_piece;
+        switch (move_code) {
+            case npromo: case c_npromo: promo_piece = state.side_to_move == white ? N : n; break;
+            case bpromo: case c_bpromo: promo_piece = state.side_to_move == white ? B : b; break;
+            case rpromo: case c_rpromo: promo_piece = state.side_to_move == white ? R : r; break;
+            case qpromo: case c_qpromo: promo_piece = state.side_to_move == white ? Q : q; break;
+        }
+
+        set_bit(state.bitboards[promo_piece], to_sq);
+        key ^= zobrist::piece_keys[promo_piece * 64 + to_sq];
+        state.piece_list[to_sq] = promo_piece;
+    }
+
+    // Castling
+    if (move_code == kcastle || move_code == qcastle) {
         if (state.side_to_move == white) {
-            state.piece_list[to_sq] = N;
-            set_bit(state.bitboards[N], to_sq);
+            if (move_code == kcastle) {
+                pop_bit(state.bitboards[R], h1);
+                key ^= zobrist::piece_keys[R * 64 + h1];
+                set_bit(state.bitboards[R], f1);
+                key ^= zobrist::piece_keys[R * 64 + f1];
+                state.piece_list[h1] = no_piece;
+                state.piece_list[f1] = R;
+            } else {
+                pop_bit(state.bitboards[R], a1);
+                key ^= zobrist::piece_keys[R * 64 + a1];
+                set_bit(state.bitboards[R], d1);
+                key ^= zobrist::piece_keys[R * 64 + d1];
+                state.piece_list[a1] = no_piece;
+                state.piece_list[d1] = R;
+            }
         } else {
-            state.piece_list[to_sq] = n;
-            set_bit(state.bitboards[n], to_sq);
+            if (move_code == kcastle) {
+                pop_bit(state.bitboards[r], h8);
+                key ^= zobrist::piece_keys[r * 64 + h8];
+                set_bit(state.bitboards[r], f8);
+                key ^= zobrist::piece_keys[r * 64 + f8];
+                state.piece_list[h8] = no_piece;
+                state.piece_list[f8] = r;
+            } else {
+                pop_bit(state.bitboards[r], a8);
+                key ^= zobrist::piece_keys[r * 64 + a8];
+                set_bit(state.bitboards[r], d8);
+                key ^= zobrist::piece_keys[r * 64 + d8];
+                state.piece_list[a8] = no_piece;
+                state.piece_list[d8] = r;
+            }
         }
     }
 
-    if (move_code == bpromo || move_code == c_bpromo) {
-        if (state.side_to_move == white) {
-            state.piece_list[to_sq] = B;
-            set_bit(state.bitboards[B], to_sq);
-        } else {
-            state.piece_list[to_sq] = b;
-            set_bit(state.bitboards[b], to_sq);
-        }
-    }
-    
-    if (move_code == rpromo || move_code == c_rpromo) {
-        if (state.side_to_move == white) {
-            state.piece_list[to_sq] = R;
-            set_bit(state.bitboards[R], to_sq);
-        } else {
-            state.piece_list[to_sq] = r;
-            set_bit(state.bitboards[r], to_sq);
-        }
+    // Remove old en passant key
+    if (state.enpassant_square != no_square) {
+        key ^= zobrist::ep_file_key[state.enpassant_square & 7];
     }
 
-    if (move_code == qpromo || move_code == c_qpromo) {
-        if (state.side_to_move == white) {
-            state.piece_list[to_sq] = Q;
-            set_bit(state.bitboards[Q], to_sq);
-        } else {
-            state.piece_list[to_sq] = q;
-            set_bit(state.bitboards[q], to_sq);
-        }
+    if (move_code == dbpush) {
+        state.enpassant_square = state.side_to_move == white ? Squares(to_sq - 8) : Squares(to_sq + 8);
+        key ^= zobrist::ep_file_key[state.enpassant_square & 7];
+    } else {
+        state.enpassant_square = no_square;
     }
 
-    if (move_code == kcastle) {
-        if (state.side_to_move == white) {
-            pop_bit(state.bitboards[R], h1);
-            state.piece_list[h1] = no_piece;
-            set_bit(state.bitboards[R], f1);
-            state.piece_list[f1] = R;
-        } else {
-            pop_bit(state.bitboards[r], h8);
-            state.piece_list[h8] = no_piece;
-            set_bit(state.bitboards[r], f8);
-            state.piece_list[f8] = r;
-        }
-    }
-
-    if (move_code == qcastle) {
-        if (state.side_to_move == white) {
-            pop_bit(state.bitboards[R], a1);
-            state.piece_list[a1] = no_piece;
-            set_bit(state.bitboards[R], d1);
-            state.piece_list[d1] = R;
-        } else {
-            pop_bit(state.bitboards[r], a8);
-            state.piece_list[a8] = no_piece;
-            set_bit(state.bitboards[r], d8);
-            state.piece_list[d8] = r;
-        }
-    }
-
-    array<int, 64> castle_encoder = {
-        13, 15, 15, 15, 12, 15, 15, 14,
-        15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15,
-        15, 15, 15, 15, 15, 15, 15, 15,
-         7, 15, 15, 15,  3, 15, 15, 11
-    };
+    // Castling rights
+    if (state.castling_rights & wking_side) key ^= zobrist::castling_keys[0];
+    if (state.castling_rights & wqueen_side) key ^= zobrist::castling_keys[1];
+    if (state.castling_rights & bking_side) key ^= zobrist::castling_keys[2];
+    if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
 
     state.castling_rights &= castle_encoder[from_sq];
     state.castling_rights &= castle_encoder[to_sq];
 
-    if (move_code == dbpush) {
-        if (state.side_to_move == white)
-            state.enpassant_square = Squares(to_sq - 8);
-        else 
-            state.enpassant_square = Squares(to_sq + 8);
-    } else
-        state.enpassant_square = no_square;
+    if (state.castling_rights & wking_side) key ^= zobrist::castling_keys[0];
+    if (state.castling_rights & wqueen_side) key ^= zobrist::castling_keys[1];
+    if (state.castling_rights & bking_side) key ^= zobrist::castling_keys[2];
+    if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
 
+    // Update counters and side to move
     if (state.side_to_move == black) state.fullmove_counter++;
-    state.side_to_move = state.side_to_move == black ? white : black;
-    if (move_code == capture || piece == p || piece == P)
-        state.halfmove_clock = 0;
-    else
-        state.halfmove_clock++;
+    state.halfmove_clock = (move_code == capture || piece == p || piece == P) ? 0 : state.halfmove_clock + 1;
 
+    state.side_to_move = Colours(int(state.side_to_move) ^ 1);
+    key ^= zobrist::side_key;
+
+    // Recalculate all-piece sets
     state.bitboards[12] = state.bitboards[p] | state.bitboards[n] | state.bitboards[b] |
                           state.bitboards[r] | state.bitboards[q] | state.bitboards[k];
     state.bitboards[13] = state.bitboards[P] | state.bitboards[N] | state.bitboards[B] |
                           state.bitboards[R] | state.bitboards[Q] | state.bitboards[K];
     state.bitboards[14] = state.bitboards[12] | state.bitboards[13];
-
-    state.hash_key = zobrist::gen_pos_key(state);
 }
 
 void Board::unmake_last_move() {
@@ -623,9 +614,3 @@ void Board::unmake_last_move() {
         prev_states.pop_back();
     }
 }
-
-// bool Board::is_over() {
-//     if (move_list.is_empty())
-//         return true;
-//     return false;
-// }

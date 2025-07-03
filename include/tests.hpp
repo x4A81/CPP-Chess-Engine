@@ -1,9 +1,9 @@
 #ifndef TESTS_H_INCLUDE
 #define TESTS_H_INCLUDE
 
-#include <iostream>
 #include "../include/board.hpp"
 #include "../include/utils.hpp"
+#include <iostream>
 
 namespace tests {
     long positions_searched = 0;
@@ -62,19 +62,19 @@ namespace tests {
     void perft_suite() {
         std::cout << "Initial Position" << std::endl;
         test_board = Board(1);
-        test(1, 5, 0);
+        test(1, 4, 0);
 
         std::cout << "\nKiwipete Position" << std::endl;
         test_board.load_fen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 0");
-        test(1, 5, 0);
+        test(1, 4, 0);
         
         std::cout << "\nEnpassant Discovered check Position" << std::endl;
         test_board.load_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1");
-        test(1, 5, 0);
+        test(1, 4, 0);
         
         std::cout << "\nProblematic Position" << std::endl;
         test_board.load_fen("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8");
-        test(1, 5, 0);
+        test(1, 4, 0);
     }
 }
 

@@ -49,11 +49,22 @@ int castling_rights = wking_side | wqueen_side;
 
 */
 
-enum Castling_Rights : int {
+enum CastlingRights : int {
     wking_side = 1,
     wqueen_side,
     bking_side = 4,
     bqueen_side = 8
+};
+
+inline constexpr array<int, 64> castle_encoder = {
+    13, 15, 15, 15, 12, 15, 15, 14,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    15, 15, 15, 15, 15, 15, 15, 15,
+    7, 15, 15, 15,  3, 15, 15, 11
 };
 
 /// Move encoding:
@@ -75,15 +86,16 @@ enum Castling_Rights : int {
 /// 13   | 1     | 1    | 0         | 1    | bishop promo capt
 /// 14   | 1     | 1    | 1         | 0    | rook promo capt
 /// 15   | 1     | 1    | 1         | 1    | queen promo capt
+
 using Move = uint16_t;
 #define nullmove 0
 
-enum Move_Code : int {
+enum MoveCode : int {
     quiet, dbpush, kcastle, qcastle, capture, epcapture, 
     npromo = 8, bpromo, rpromo, qpromo, c_npromo, c_bpromo, c_rpromo, c_qpromo
 };
 
-class Move_List {
+class MoveList {
 private:
     std::array<Move, 256> _moves;
     std::size_t _size;
@@ -111,7 +123,7 @@ struct Board_State {
     int halfmove_clock;
     int fullmove_counter;
     KEY hash_key;
-    Move_List move_list;
+    MoveList move_list;
     void reset();
 };
 
@@ -138,14 +150,14 @@ public:
     Board_State state;
 
     Board() {
-        movegenerator::init_sliding_move_tables();
+        move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         state.reset();
         prev_states.push_back(state);
     }
 
     Board(std::string fen) {
-        movegenerator::init_sliding_move_tables();
+        move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen(fen);
         prev_states.push_back(state);
@@ -153,7 +165,7 @@ public:
 
     Board(int load_start) {
         if (!load_start) return;
-        movegenerator::init_sliding_move_tables();
+        move_generator::init_sliding_move_tables();
         load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         prev_states.push_back(state);
         zobrist::init_keys();

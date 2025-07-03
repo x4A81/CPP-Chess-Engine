@@ -1,8 +1,10 @@
-#include <random>
 #include "../include/board.hpp"
-#include <iostream>
+#include <random>
+
+#define SEED 34567
+
 void zobrist::init_keys() {
-    std::mt19937_64 gen(KEY(34567)); 
+    std::mt19937_64 gen(KEY(SEED)); 
     std::uniform_int_distribution<KEY> dist(0, UINT64_MAX);
 
     for (auto& key : piece_keys) {
