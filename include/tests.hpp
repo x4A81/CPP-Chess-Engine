@@ -1,5 +1,5 @@
-#ifndef TESTS_H_INCLUDE
-#define TESTS_H_INCLUDE
+#ifndef TESTS_HPP_INCLUDE
+#define TESTS_HPP_INCLUDE
 
 #include "../include/board.hpp"
 #include "../include/utils.hpp"

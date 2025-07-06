@@ -235,6 +235,8 @@ void Board::generate_moves() {
         int to_sq = pop_lsb(king_movement);
         state.move_list.add(generate_move_nopromo(king_sq, to_sq));
     }
+
+    is_in_check = !null_if_check;
     
     // If dbl check only king moves are allowed
     if (move_mask == 0) return;
@@ -482,9 +484,9 @@ void Board::make_move(Move move) {
         return;
     }
 
-    Squares from_sq = Squares(move & 0b111111), to_sq = Squares((move >> 6) & 0b111111);
+    Squares from_sq = Squares(get_from_sq(move)), to_sq = Squares(get_to_sq(move));
     Pieces piece = state.piece_list[from_sq];
-    int move_code = move >> 12;
+    int move_code = get_code(move);
 
     // Remove piece from source
     pop_bit(state.bitboards[piece], from_sq);
@@ -613,4 +615,31 @@ void Board::unmake_last_move() {
         state = prev_states.back();
         prev_states.pop_back();
     }
+}
+
+bool Board::is_draw() {
+    if (state.move_list.is_empty() && !is_in_check) return true;
+    if (state.halfmove_clock >= 50) return true;
+
+    int repetition_count = 1; // include current state
+    KEY current_key = state.hash_key;
+    for (const auto& prev : prev_states) {
+        if (prev.hash_key == current_key)
+            repetition_count++;
+    }
+
+    if (repetition_count >= 3) return true;
+
+    return false;
+}
+
+bool Board::is_over() {
+    if (state.move_list.is_empty() || is_draw());
+        return true;
+    return false;
+}
+
+Colours Board::winner() {
+    if (state.move_list.is_empty() && is_in_check) return opposition_colour(state.side_to_move);
+    return no_colour;
 }

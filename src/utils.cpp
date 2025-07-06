@@ -65,9 +65,9 @@ std::string square_to_string(Squares sq) {
 }
 
 void print_move(Move move) {
-    int from_sq = move & 0b111111;
-    int to_sq = (move >> 6) & 0b111111;
-    int code = move >> 12;
+    int from_sq = get_from_sq(move);
+    int to_sq = get_to_sq(move);
+    int code = get_code(move);
     std::cout << square_to_string(Squares(from_sq)) << square_to_string(Squares(to_sq));
     switch (code) {
         case npromo:

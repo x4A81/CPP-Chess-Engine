@@ -1,5 +1,5 @@
-#ifndef UTILS_H_INCLUDE
-#define UTILS_H_INCLUDE
+#ifndef UTILS_HPP_INCLUDE
+#define UTILS_HPP_INCLUDE
 
 #include "board.hpp"
 #include <cstring>

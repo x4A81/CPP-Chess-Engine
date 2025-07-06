@@ -1,5 +1,5 @@
-#ifndef BOARD_H_INCLUDE
-#define BOARD_H_INCLUDE
+#ifndef BOARD_HPP_INCLUDE
+#define BOARD_HPP_INCLUDE
 
 #include "misc.hpp"
 #include <cstdint>
@@ -7,6 +7,11 @@
 #include <array>
 #include <stack>
 #include <vector>
+#include <chrono>
+
+class Board;
+
+extern Board game_board;
 
 #define CAPTURES true
 #define ALLMOVES false
@@ -41,6 +46,11 @@ enum Pieces : int {
 enum Colours : int {
     black, white, no_colour
 };
+
+inline Colours opposition_colour(Colours friendly_colour) {
+    if (friendly_colour == no_colour) return no_colour;
+    return static_cast<Colours>(friendly_colour ^ 1);
+}
 
 /* Used for encoding castling rights:
 eg:
@@ -95,9 +105,16 @@ enum MoveCode : int {
     npromo = 8, bpromo, rpromo, qpromo, c_npromo, c_bpromo, c_rpromo, c_qpromo
 };
 
+inline bool is_move(Move move, MoveCode code)  { return (move >> 12) == code; }
+inline int get_from_sq(Move move) { return move & 0b111111; }
+inline int get_to_sq(Move move) { return (move >> 6) & 0b111111; }
+inline int get_code(Move move) { return move >> 12; }
+
+constexpr int MAX_MOVE_LIST_SIZE = 256;
+
 class MoveList {
 private:
-    std::array<Move, 256> _moves;
+    std::array<Move, MAX_MOVE_LIST_SIZE> _moves;
     std::size_t _size;
 
 public:
@@ -107,10 +124,18 @@ public:
         _moves.fill(0);
         _size = 0;
     }
-
+    
+    std::size_t size() { return _size; }
     auto begin() { return _moves.begin(); };
     auto end() { return _moves.begin() + _size; }
     bool is_empty() { return _size == 0 ? true : false; }
+    const Move& operator[](std::size_t idx) const {
+        return _moves[idx];
+    }
+
+    Move& operator[](std::size_t idx) {
+        return _moves[idx];
+    }
 };
 
 using KEY = uint64_t;
@@ -140,14 +165,35 @@ namespace zobrist {
     KEY gen_pos_key(Board_State& state);
 }
 
+#define MAX_PLY 84
+#define MAX_DEPTH 64
+#define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
+
+struct SearchState {
+    long ply = 0;
+    long nodes = 0;
+    std::chrono::steady_clock::time_point start_time;
+    std::array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
+    std::array<int, MAX_PLY> pv_length = { 0 };
+    std::array<std::array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
+    std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
+    Move fallback_move = nullmove;
+};
+
+struct SearchParams;
+
 class Board {
 private:
     std::vector<Board_State> prev_states;
     Move generate_move_nopromo(int from_sq, int to_sq);
-    
+    int quiescence(int alpha, int beta);
+    int search(int depth, int alpha, int beta);
+    bool is_search_stopped();
+    void order_moves(Move hash_move);
 public:
-
+    SearchState search_state;
     Board_State state;
+    bool is_in_check;
 
     Board() {
         move_generator::init_sliding_move_tables();
@@ -178,7 +224,8 @@ public:
     void generate_moves();
     void make_move(Move move);
     void unmake_last_move();
-
+    int eval();
+    void run_search(SearchParams params);
     bool is_draw();
     bool is_over();
     Colours winner();

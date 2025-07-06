@@ -1,5 +1,5 @@
-#ifndef BITBOARD_UTILS_H_INCLUDE
-#define BITBOARD_UTILS_H_INCLUDE
+#ifndef BITBOARD_UTILS_HPP_INCLUDE
+#define BITBOARD_UTILS_HPP_INCLUDE
 
 using namespace std;
 
@@ -114,6 +114,9 @@ namespace bitboard_utils {
 
     /// @brief Count the number of bits set in the bitboard
     inline int pop_count(BB bb) { return popcount(bb); }
+    
+    /// @brief Find the index of the most significan set bit
+    inline int bitscan_reverse(BB bb) { return 63 - countl_zero(bb); }
 
     /// @brief Pop the least significant bit from the bitboard and return its index
     inline int pop_lsb(BB& bb) {

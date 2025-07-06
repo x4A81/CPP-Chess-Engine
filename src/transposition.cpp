@@ -1,0 +1,58 @@
+#include "../include/transposition.hpp"
+#include <algorithm>
+#include <cassert>
+
+void Transposition::init(std::size_t size) {
+    if (transposition_tt) {
+        delete[] transposition_tt;
+        transposition_tt = nullptr;
+        transposition_size = 0;
+    }
+
+    if (size == 0) return;
+
+    size = std::clamp(size, MIN_TT_SIZE_MB, MAX_TT_SIZE_MB);
+    std::size_t power = 1;
+    while (power < size && (power << 1) > 0) power <<= 1; // Round up to nearest power of 2
+    size = power;
+    while (transposition_size == 0 && size >= MIN_TT_SIZE_MB) {
+        try {
+            transposition_tt = new TranspositionEntry[size]();
+            transposition_size = size;
+        } catch (const std::bad_alloc&) {
+            transposition_tt = nullptr;
+            transposition_size = 0;
+            size /= 2;
+        }
+    }
+
+    is_initialised = true;
+}
+
+void Transposition::clear_tt() {
+    if (transposition_tt && transposition_size > 0)
+        std::fill_n(transposition_tt, transposition_size, TranspositionEntry{});
+}
+
+TranspositionEntry* Transposition::probe(KEY key, int depth) {
+    if (!transposition_tt || transposition_size == 0)
+        return nullptr;
+    
+    int index = key & (transposition_size - 1);
+    TranspositionEntry *entry = &transposition_tt[index];
+
+    assert(index < transposition_size);
+
+    if (entry->key == key && entry->depth >= depth)
+        return entry;
+    return nullptr;
+}
+
+void Transposition::store_entry(TranspositionEntry& entry) {
+    if (!transposition_tt || transposition_size == 0)
+        return;
+
+    int index = entry.key & (transposition_size - 1);
+    TranspositionEntry *table_entry = &transposition_tt[index];
+    *table_entry = entry;
+}

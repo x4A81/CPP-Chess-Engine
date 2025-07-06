@@ -2,18 +2,17 @@
 #include "../include/utils.hpp"
 #include "../include/board.hpp"
 #include "../include/search.hpp"
+#include "../include/transposition.hpp"
 #include <iostream>
 #include <vector>
 #include <sstream>
 #include <thread>
 
 using namespace std;
-using namespace uci;
 
-Board global_board;
 bool is_board_initialised = false;
 
-vector<string> uci::get_tokens(const string& command) {
+vector<string> get_tokens(const string& command) {
     istringstream iss(command);
     vector<string> tokens;
     string this_token;
@@ -21,14 +20,17 @@ vector<string> uci::get_tokens(const string& command) {
         tokens.push_back(this_token);
     
     return tokens;
-
 }
 
-Move uci::parse_move_string(const string move_str) {
+void stop_search() {
+    stop_flag = true;
+}
+
+Move parse_move_string(const string move_str) {
     Move move = nullmove;
     int code = 0;
 
-    Board_State state = global_board.state;
+    Board_State state = game_board.state;
 
     int file = move_str[0] - 'a';
     int rank = move_str[1] - '1';
@@ -78,40 +80,67 @@ Move uci::parse_move_string(const string move_str) {
     return move | (code << 12);
 }
 
-void uci::send_info() {
+void send_info() {
     cout << "id name Chess Engine" << endl;
     cout << "id author x4A81" << endl;
+    cout << "option name Hash type spin default " << (MAX_TT_SIZE_MB+MIN_TT_SIZE_MB)/2 << " min " << MIN_TT_SIZE_MB << " max " << MAX_TT_SIZE_MB << endl;
+    cout << "uciok" << endl;
 }
 
-void uci::setup_engine() {
-    if (!is_board_initialised) global_board = Board(1);
+void setup_engine() {
+    if (!is_board_initialised) game_board = Board(1);
     // setup transposition table and search thread
+    if (!game_table.has_value()) game_table.emplace((MAX_TT_SIZE_MB+MIN_TT_SIZE_MB)/2);
 }
 
-void uci::clean() {
-    stop_search();
-    // clear transpositoin table and search thread
-}
-
-void uci::stop_search() {
+void clean() {
     stop_flag = true;
+    // clear transpositoin table and search thread
+    // game_table.clear_tt();
 }
 
-void uci::handle_go(const string& command) {
+void handle_go(const string& command) {
     SearchParams params;
-    params.max_depth = 8;
-    thread search_thread([params]() { run_search(params); });
+    vector<string> tokens = get_tokens(command);
+
+    if (tokens.size() == 1) return;
+
+    for (size_t i = 1; i < tokens.size(); ++i) {
+        const string& tok = tokens[i];
+        if (tok == "depth" && i + 1 < tokens.size())
+            params.max_depth = stoi(tokens[++i]);
+        else if (tok == "movetime" && i + 1 < tokens.size())
+            params.move_time = stoi(tokens[++i]);
+        else if (tok == "nodes" && i + 1 < tokens.size())
+            params.nodes = stoi(tokens[++i]);
+        else if (tok == "infinite")
+            params.infinite = true;
+        else if (tok == "wtime" && i + 1 < tokens.size())
+            params.total_time = stoi(tokens[++i]);
+        else if (tok == "btime" && i + 1 < tokens.size())
+            params.total_time = stoi(tokens[++i]);
+        else if (tok == "winc" && i + 1 < tokens.size())
+            params.inc = stoi(tokens[++i]);
+        else if (tok == "binc" && i + 1 < tokens.size())
+            params.inc = stoi(tokens[++i]);
+    }
+
+    stop_flag = false;
+    thread search_thread([params]() { game_board.run_search(params); });
     search_thread.detach();
 }
 
-bool uci::handle_command(const string& command) {
-    if (command == "quit")
+bool handle_command(const string& command) {
+    if (command == "quit") {
+        clean();
         return false;
-
-    if (command == "uci") {
-        send_info();
-        cout << "uciok" << endl;
     }
+
+    if (command == "uci")
+        send_info();
+
+    if (command == "stop")
+        stop_flag = true;
 
     if (command == "isready") {
         setup_engine();
@@ -121,6 +150,26 @@ bool uci::handle_command(const string& command) {
     if (command.starts_with("go"))
         handle_go(command);
 
+    if (command.starts_with("setoption")) {
+        vector<string> tokens = get_tokens(command);
+        string name, value;
+        for (size_t i = 1; i < tokens.size(); ++i) {
+            if (tokens[i] == "name" && i + 1 < tokens.size()) {
+                name = tokens[++i];
+            } else if (tokens[i] == "value" && i + 1 < tokens.size()) {
+                value = tokens[++i];
+            }
+        }
+
+        if (name == "Hash" && !value.empty()) {
+            int mb = stoi(value);
+            mb = std::clamp(mb, int(MIN_TT_SIZE * TT_ENTRY_SIZE / (1024 * 1024)), int(MAX_TT_SIZE * TT_ENTRY_SIZE / (1024 * 1024)));
+            std::size_t entries = (mb * 1024 * 1024) / TT_ENTRY_SIZE;
+            game_table.emplace(entries);
+            cout << "info string Hash set to " << mb << " MB" << endl;
+        }
+    }
+
     if (command.starts_with("position")) {
         vector<string> tokens = get_tokens(command);
         int token_idx = 1;
@@ -129,11 +178,10 @@ bool uci::handle_command(const string& command) {
 
             string this_token = tokens.at(token_idx);
             if (parsing_moves) {
-                global_board.print_board();
-                global_board.make_move(parse_move_string(this_token));
+                game_board.make_move(parse_move_string(this_token));
             } else {
                 if (this_token == "startpos") {
-                    global_board = Board(1);
+                    game_board = Board(1);
                     is_board_initialised = true;
                 }
                 
@@ -144,7 +192,8 @@ bool uci::handle_command(const string& command) {
                         fen += tokens.at(token_idx + i);
                         if (i < 6) fen += " ";
                     }
-                    global_board = Board(fen);
+
+                    game_board = Board(fen);
                     token_idx += 6;
 
                     is_board_initialised = true;
@@ -159,7 +208,7 @@ bool uci::handle_command(const string& command) {
 
     }
 
-    if (command == "d") global_board.print_board();
+    if (command == "d") game_board.print_board();
 
     return true;
 }

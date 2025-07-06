@@ -1,18 +1,9 @@
-/*
-
-
-UNUSED
-
-TEMPLATE OF FUTURE IMPLEMENTATION OF TRANPOSITION TABLE
-
-
-*/
-
-#ifndef TRANSPOSITION_H_INCLUDE
-#define TRANSPOSITION_H_INCLUDE
+#ifndef TRANSPOSITION_HPP_INCLUDE
+#define TRANSPOSITION_HPP_INCLUDE
 
 #include "board.hpp"
 #include <cstddef>
+#include <optional>
 
 enum EntryType {
     EXACT,
@@ -20,7 +11,7 @@ enum EntryType {
     UPPER
 };
 
-struct alignas(64) TRANSPOSITION_ENTRY {
+struct alignas(64) TranspositionEntry {
     KEY key;
     Move hash_move;
     int depth;
@@ -28,16 +19,20 @@ struct alignas(64) TRANSPOSITION_ENTRY {
     EntryType type;
 };
 
+constexpr std::size_t MIN_TT_SIZE_MB = 64;
+constexpr std::size_t MAX_TT_SIZE_MB = 512;
+constexpr std::size_t TT_ENTRY_SIZE = sizeof(TranspositionEntry);
+constexpr std::size_t MIN_TT_SIZE = (MIN_TT_SIZE_MB * 1024 * 1024) / TT_ENTRY_SIZE;
+constexpr std::size_t MAX_TT_SIZE = (MAX_TT_SIZE_MB * 1024 * 1024) / TT_ENTRY_SIZE;
+
 class Transposition {
 private:
-    TRANSPOSITION_ENTRY* transposition_tt;
-    std::size_t transposition_size;
+    TranspositionEntry* transposition_tt = nullptr;
+    std::size_t transposition_size = 0;
     void init(std::size_t size);
 public:
-    Transposition(std::size_t size = 0) : transposition_tt(nullptr), transposition_size(size) {
-        if (size > 0) {
-            init(size);
-        }
+    Transposition(std::size_t size = 0) {
+        init(size);
     }
 
     ~Transposition() {
@@ -47,9 +42,16 @@ public:
         }
     }
 
-    void clear();
-    TRANSPOSITION_ENTRY* probe(KEY key);
-    void store_entry(const TRANSPOSITION_ENTRY& entry);
+    Transposition(const Transposition&) = delete;
+    Transposition& operator=(const Transposition&) = delete;
+
+    bool is_initialised = false;
+
+    void clear_tt();
+    TranspositionEntry* probe(KEY key, int depth);
+    void store_entry(TranspositionEntry& entry);
 };
+
+extern std::optional<Transposition> game_table;
 
 #endif

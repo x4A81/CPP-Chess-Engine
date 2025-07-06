@@ -1,5 +1,5 @@
-#ifndef SEARCH_HPP
-#define SEARCH_HPP
+#ifndef SEARCH_HPP_INCLUDE
+#define SEARCH_HPP_INCLUDE
 
 #include "board.hpp"
 #include "transposition.hpp"
@@ -7,45 +7,31 @@
 #include <atomic>
 #include <chrono>
 
-#define MAX_PLY 64
-#define MAX_DEPTH 64
-#define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
 #define INF 100000
+#define NOT_USED -1;
 
 inline std::atomic<bool> stop_flag;
 inline Transposition transposition_table;
 
 struct SearchParams {
-    int start_depth = 1;
     int max_depth = 0;
-    int nodes = 0;
-    int move_time = 0;
-    int inc = 0;
+    int nodes = NOT_USED;
+    int move_time = NOT_USED;
+    int inc = NOT_USED;
+    int total_time = NOT_USED;
     bool infinite = false;
-    bool ponder = false;
+
+    // Unsupported
+    // bool ponder = false;
 };
 
-struct SearchState {
-    std::chrono::steady_clock::time_point start_time;
-    std::array<Move, PV_TABLE_SIZE> pv_table;
-    std::array<int, MAX_PLY> pv_length;
-    std::array<std::array<Move, 2>, MAX_PLY> killer_moves;
-    Move fallback_move = nullmove;
-};
-
-inline int pv_index(int ply) { return (ply*(2*MAX_PLY+1-ply))/2; }
-inline int next_pv_index(int ply) { return pv_index(ply) + MAX_PLY - ply; }
-inline int elapsed_ms(const SearchState& vars) {
+inline int get_pv_index(int ply) { return (ply*(2*MAX_PLY+1-ply))/2; }
+inline int get_next_pv_index(int ply) { return get_pv_index(ply) + MAX_PLY - ply; }
+inline int elapsed_ms(std::chrono::steady_clock::time_point time) {
     using namespace std::chrono;
-    return duration_cast<milliseconds>(
-        steady_clock::now() - vars.start_time
-    ).count();
+    return static_cast<int>(duration_cast<milliseconds>(
+        steady_clock::now() - time
+    ).count());
 }
-
-void order_moves(MoveList& move_List);
-int quiescence(SearchState& vars, int alpha, int beta);
-int search(SearchState& vars, int depth, int alpha, int beta);
-void reset_search();
-void run_search(SearchParams params);
 
 #endif

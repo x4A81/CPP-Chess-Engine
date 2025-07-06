@@ -23,12 +23,12 @@ if(result)
     set_property(TARGET Engine PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 endif()
 
-target_link_options(Engine PRIVATE
-    $<$<CONFIG:Debug>: -pg>
+target_link_libraries(Engine PRIVATE
+    $<$<CONFIG:Debug>:-fsanitize=address>
 )
 
 target_compile_options(Engine PRIVATE
-    $<$<CONFIG:Debug>: -g -pg -march=native>
+    $<$<CONFIG:Debug>: -g -fsanitize=address -march=native>
     $<$<CONFIG:Release>: -O3 -march=native>
 )
 
