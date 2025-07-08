@@ -36,9 +36,6 @@ Move parse_move_string(const string move_str) {
     int rank = move_str[1] - '1';
     int from_sq = rank * 8 + file;
 
-    cout << square_to_string(Squares(from_sq)) << endl;
-    
-
     file = move_str[2] - 'a';
     rank = move_str[3] - '1';
     int to_sq = rank * 8 + file;

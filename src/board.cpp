@@ -209,7 +209,9 @@ void Board::generate_moves() {
 
     // Non-sliding pieces
     opp_any_attacks |= knight_attacks((state.bitboards[n] | state.bitboards[N]) & opponent_pieces);
-
+    opp_any_attacks |= king_attacks((state.bitboards[k] | state.bitboards[K]) & opponent_pieces);
+    BB kings = (state.bitboards[k] | state.bitboards[K]) & opponent_pieces;
+    
     if (state.side_to_move == white)
         opp_any_attacks |= bpawn_attacks(state.bitboards[p]);
     else
@@ -335,7 +337,8 @@ void Board::generate_moves() {
     }
 
     // Attacks
-    BB targets = (opponent_pieces & move_mask) | mask(state.enpassant_square);
+    BB ep_mask = state.enpassant_square == no_square ? 0 : mask(state.enpassant_square);
+    BB targets = (opponent_pieces & move_mask) | ep_mask;
     pawns = (state.bitboards[p] | state.bitboards[P]) & friendly_pieces;
 
     BB attacking = pawns & ~(all_inbetween ^ dia_inbetween);
@@ -496,6 +499,15 @@ void Board::make_move(Move move) {
     // Handle captures
     if (move_code == capture || move_code >= c_npromo) {
         Pieces c_piece = state.piece_list[to_sq];
+        if (c_piece == no_piece) {
+            for (auto s : prev_states) {
+                print_piece_list(s.piece_list);
+                cout << endl;
+            }
+            print_move(move);
+            cout << endl;
+            print_board();
+        }
         pop_bit(state.bitboards[c_piece], to_sq);
         key ^= zobrist::piece_keys[c_piece * 64 + to_sq];
     }

@@ -23,13 +23,17 @@ if(result)
     set_property(TARGET Engine PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
 endif()
 
+set_target_properties(Engine PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
 target_link_libraries(Engine PRIVATE
-    $<$<CONFIG:Debug>:-fsanitize=address>
+    $<$<CONFIG:Debug>:>
 )
 
 target_compile_options(Engine PRIVATE
-    $<$<CONFIG:Debug>: -g -fsanitize=address -march=native>
-    $<$<CONFIG:Release>: -O3 -march=native>
+    $<$<CONFIG:Debug>: -g -march=native>
+    $<$<CONFIG:Release>: -O3 -march=native -DNDEBUG>
 )
 
 # cmake -S "path to CMakeLists.txt" -B build -DCMAKE_BUILD_TYPE=Debug

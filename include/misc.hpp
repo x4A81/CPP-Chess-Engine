@@ -6,6 +6,7 @@ using namespace std;
 #include <cstdint>
 #include <array>
 #include <bit>
+#include <cassert>
 
 using BB = uint64_t;
 
@@ -98,7 +99,8 @@ namespace bitboard_utils {
                                          17, 10, -6, -15, 15, 6, -10, -17 };
     
     /// @brief Mask the square to a bitboard
-    inline constexpr BB mask(int sq) { return BB(1) << sq; }
+    inline constexpr BB mask(int sq) { 
+        assert(sq >= 0 && sq < 64); return BB(1) << sq; }
 
     /// @brief Pop the bit at square in the bitboard
     inline void pop_bit(BB& bb, int sq) { bb &= ~mask(sq); }
@@ -109,17 +111,18 @@ namespace bitboard_utils {
     /// @brief Get the bit at square in the bitboard
     inline int get_bit(BB bb, int sq) { return (bb >> sq) & 1; }
 
-    /// @brief Find the index of the least significant bit set in the bitboard
-    inline int bitscan_forward(BB bb) { return countr_zero(bb); }
-
     /// @brief Count the number of bits set in the bitboard
     inline int pop_count(BB bb) { return popcount(bb); }
     
+    /// @brief Find the index of the least significant bit set in the bitboard
+    inline int bitscan_forward(BB bb) { assert(bb != 0); return countr_zero(bb); }
+    
     /// @brief Find the index of the most significan set bit
-    inline int bitscan_reverse(BB bb) { return 63 - countl_zero(bb); }
+    inline int bitscan_reverse(BB bb) { assert(bb != 0); return 63 - countl_zero(bb); }
 
     /// @brief Pop the least significant bit from the bitboard and return its index
     inline int pop_lsb(BB& bb) {
+        assert(bb != 0);
         int sq = countr_zero(bb);
         bb &= bb - 1;
         return sq;
@@ -191,6 +194,12 @@ namespace move_generator {
         BB h1 = l1 | r1;
         BB h2 = l2 | r2;
         return (h1 << 16) | (h1 >> 16) | (h2 << 8) | (h2 >> 8);
+    }
+
+    inline BB king_attacks(BB kings) {
+        BB attacks = ((kings >> 1) & nHFILE) | ((kings << 1) & nAFILE);
+        kings |= attacks;
+        return (kings << 8) | (kings >> 8) | attacks;
     }
 
     /// @brief Pawn attack table, indexed by [sq][side]

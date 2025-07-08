@@ -165,12 +165,13 @@ namespace zobrist {
     KEY gen_pos_key(Board_State& state);
 }
 
-#define MAX_PLY 84
-#define MAX_DEPTH 64
+#define MAX_PLY 64
+#define MAX_DEPTH 10
 #define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
 
 struct SearchState {
-    long ply = 0;
+    int depth = 0;
+    int ply = 0;
     long nodes = 0;
     std::chrono::steady_clock::time_point start_time;
     std::array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
@@ -190,6 +191,7 @@ private:
     int search(int depth, int alpha, int beta);
     bool is_search_stopped();
     void order_moves(Move hash_move);
+
 public:
     SearchState search_state;
     Board_State state;

@@ -3,7 +3,9 @@
 #include "../include/utils.hpp"
 #include "../include/transposition.hpp"
 #include <iostream>
+#include <algorithm>
 #include <array>
+#include <cassert>
 
 const SearchParams* g_search_params = nullptr;
 
@@ -42,6 +44,14 @@ void Board::order_moves(Move hash_move) {
                 if (attacker > 5) attacker -= 6;
                 int victim = state.piece_list[to];
                 if (victim > 5) victim -= 6;
+                if (victim == k) {
+                    print_move(move);
+                    for (auto s : prev_states) {
+                        print_piece_list(s.piece_list);
+                        cout << endl;
+                    }
+                    print_board();
+                }
                 score = 800 + mva_lva_table[victim][attacker];
             }
             else if (move == killer_0)
@@ -82,8 +92,13 @@ bool Board::is_search_stopped() {
         return true;
     
     // Depth check (current depth = root depth - ply)
-    if (g_search_params->max_depth > 0 && (g_search_params->max_depth - search_state.ply) <= 0)
+    if (g_search_params->max_depth > 0 && search_state.depth > g_search_params->max_depth)
         return true;
+
+    if (search_state.depth > MAX_DEPTH && !g_search_params->infinite)
+        return true;
+
+    if (search_state.ply >= MAX_PLY) return true;
 
     return false;
 }
@@ -94,23 +109,28 @@ int Board::quiescence(int alpha, int beta) {
     if (stand_pat >= beta) return stand_pat;
     if (stand_pat > alpha) alpha = stand_pat;
 
-    game_board.generate_moves<CAPTURES>();
-    game_board.order_moves(nullmove);
-
-    if (game_board.is_draw()) return 0;
-    if (game_board.winner() == opposition_colour(game_board.state.side_to_move)) return -INF;
+    if (state.move_list.is_empty()) {
+        generate_moves<ALLMOVES>();
+        if (is_draw()) return 0;
+        if (winner() == opposition_colour(state.side_to_move)) return -INF;
+    }
 
     if (is_search_stopped()) return best_val;
 
-    for (Move move : game_board.state.move_list) {
-        game_board.make_move(move);
+    generate_moves<CAPTURES>();
+    if (state.move_list.is_empty()) return best_val;
+    order_moves(nullmove);
+
+    for (Move move : state.move_list) {
+
+        make_move(move);
         search_state.ply++;
         search_state.nodes++;
 
         int score = -quiescence(-beta, -alpha);
 
         search_state.ply--;
-        game_board.unmake_last_move();
+        unmake_last_move();
 
         if (score >= beta) return score;
         if (is_search_stopped()) break;
@@ -126,6 +146,7 @@ int Board::search(int depth, int alpha, int beta) {
     if (depth <= 0)
         return quiescence(alpha, beta);
 
+    search_state.depth = depth;
     int score = 0;
     int static_eval = game_board.eval();
     int old_alpha = alpha;
@@ -136,16 +157,16 @@ int Board::search(int depth, int alpha, int beta) {
     int pv_idx = get_pv_index(search_state.ply);
     int next_pv_idx = get_next_pv_index(search_state.ply);
 
-    if (is_search_stopped()) return alpha;
-    
     // Transposition Table Cut-offs
     TranspositionEntry *entry = game_table->probe(state.hash_key, depth);
     if (entry && search_state.pv_table[pv_idx] != 0) {
         if ((entry->type == EXACT) 
         || (entry->type == LOWER && entry->score >= beta) 
         || (entry->type == UPPER && entry->score < alpha))
-            return entry->score;
+        return entry->score;
     }
+
+    if (is_search_stopped()) return alpha;
 
     bool can_prune = (depth <= 2) && !is_in_check;
     int pruning_margin = 125 * depth * depth;
@@ -155,24 +176,24 @@ int Board::search(int depth, int alpha, int beta) {
         return quiescence(alpha, beta);
 
     // Generate and sort moves
-    game_board.generate_moves<ALLMOVES>();
-    game_board.order_moves(entry ? entry->hash_move : nullmove);
+    generate_moves<ALLMOVES>();
+    order_moves(entry ? entry->hash_move : nullmove);
 
     // Handle game over
-    if (game_board.is_draw()) return 0;
-    if (game_board.winner() == opposition_colour(game_board.state.side_to_move)) return -INF;
+    if (is_draw()) return 0;
+    if (winner() == opposition_colour(game_board.state.side_to_move)) return -INF;
 
     if (search_state.ply+1 >= MAX_PLY) return static_eval;
     
     // Null move reduction
     if (!is_in_check) {
         int reduction = depth > 6 ? 4 : 3;
-        game_board.make_move(nullmove);
+        make_move(nullmove);
         search_state.ply++;
         search_state.nodes++;
         score = -search(depth - reduction - 1, 0-beta, 1-beta);
         search_state.ply--;
-        game_board.unmake_last_move();
+        unmake_last_move();
         if (score >= beta) {
             depth -= 4;
             if (depth <= 0)
@@ -181,16 +202,16 @@ int Board::search(int depth, int alpha, int beta) {
     }
     
     for (Move move : game_board.state.move_list) {
-        game_board.make_move(move);
+        make_move(move);
+        
         search_state.ply++;
         search_state.nodes++;
-
 
         // Futility pruning
         if (can_prune && (node_type == EXACT) && !is_move(move, capture) && get_code(move) < npromo && !is_in_check) {
             if (eval() + pruning_margin <= alpha) {
                 search_state.ply--;
-                game_board.unmake_last_move();
+                unmake_last_move();
                 continue; // Prune the move
             }
         }
@@ -224,7 +245,7 @@ int Board::search(int depth, int alpha, int beta) {
         search_state.ply--;
         int ply = search_state.ply;
 
-        game_board.unmake_last_move();
+        unmake_last_move();
 
         if (is_search_stopped()) break;
 
