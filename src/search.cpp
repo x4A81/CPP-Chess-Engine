@@ -8,8 +8,10 @@
 #include <cassert>
 
 const SearchParams* g_search_params = nullptr;
+long researches = 0;
 
-constexpr std::array<std::array<int, 6>, 5> mva_lva_table = {{
+/// @brief Values for scoring captures. See https://www.chessprogramming.org/MVV-LVA.
+constexpr std::array<std::array<int, 6>, 5> MVV_LVA_table = {{
     {{ 15, 14, 13, 12, 11, 10 }},
     {{ 25, 24, 23, 22, 21, 20 }},
     {{ 35, 34, 33, 32, 31, 30 }},
@@ -21,17 +23,27 @@ void Board::order_moves(Move hash_move) {
     auto& list = state.move_list;
     const int pv_index = get_pv_index(search_state.ply);
 
-    std::vector<std::pair<Move, int>> scored_moves(list.size());
+    std::vector<std::pair<Move, Score>> scored_moves(list.size());
     Move pv_move = search_state.pv_table[pv_index];
     Move killer_0 = search_state.killer_moves[search_state.ply][0];
     Move killer_1 = search_state.killer_moves[search_state.ply][1];
 
+    /*
+    Ranking of moves is as follows:
+    1. Hash moves (from transposition table).
+    2. PV move.
+    3. Promotions.
+    4. Captures using MVV-LVA. i.e PxR is ranked higher than BxR
+    5. Killer moves.
+    6. History moves.
+    */
+
     // Score each move using transform
     std::transform(list.begin(), list.end(), scored_moves.begin(),
-        [&](Move move) -> std::pair<Move, int> {
-            int from = get_from_sq(move);
-            int to = get_to_sq(move);
-            int score = 0;
+        [&](Move move) -> std::pair<Move, Score> {
+            Square from = get_from_sq(move);
+            Square to = get_to_sq(move);
+            Score score = 0;
 
             if (move == hash_move)
                 score = 1000;
@@ -39,20 +51,12 @@ void Board::order_moves(Move hash_move) {
                 score = 900;
             else if (get_code(move) >= npromo)
                 score = 800;
-            else if (is_move(move, capture)) {
-                int attacker = state.piece_list[from];
+            else if (is_move_capture(move)) {
+                Piece attacker = state.piece_list[from];
                 if (attacker > 5) attacker -= 6;
-                int victim = state.piece_list[to];
+                Piece victim = state.piece_list[to];
                 if (victim > 5) victim -= 6;
-                if (victim == k) {
-                    print_move(move);
-                    for (auto s : prev_states) {
-                        print_piece_list(s.piece_list);
-                        cout << endl;
-                    }
-                    print_board();
-                }
-                score = 800 + mva_lva_table[victim][attacker];
+                score = 800 + MVV_LVA_table[victim][attacker];
             }
             else if (move == killer_0)
                 score = 700;
@@ -103,31 +107,27 @@ bool Board::is_search_stopped() {
     return false;
 }
 
-int Board::quiescence(int alpha, int beta) {
-    int stand_pat = game_board.eval();
-    int best_val = stand_pat;
+// See https://www.chessprogramming.org/Quiescence_Search.
+Score Board::quiescence(Score alpha, Score beta) {
+    Score stand_pat = game_board.eval();
+    Score best_val = stand_pat;
     if (stand_pat >= beta) return stand_pat;
     if (stand_pat > alpha) alpha = stand_pat;
 
-    if (state.move_list.is_empty()) {
-        generate_moves<ALLMOVES>();
-        if (is_draw()) return 0;
-        if (winner() == opposition_colour(state.side_to_move)) return -INF;
-    }
-
-    if (is_search_stopped()) return best_val;
-
-    generate_moves<CAPTURES>();
-    if (state.move_list.is_empty()) return best_val;
+    generate_moves<ALLMOVES>();
     order_moves(nullmove);
-
+    if (is_draw()) return 0;
+    if (winner() == opposition_colour(state.side_to_move)) return -INF;
+    
+    if (is_search_stopped()) return best_val;
+    
     for (Move move : state.move_list) {
-
+        if (!is_move_capture(move)) continue;
         make_move(move);
         search_state.ply++;
         search_state.nodes++;
 
-        int score = -quiescence(-beta, -alpha);
+        Score score = -quiescence(-beta, -alpha);
 
         search_state.ply--;
         unmake_last_move();
@@ -142,15 +142,16 @@ int Board::quiescence(int alpha, int beta) {
     return best_val;
 }
 
-int Board::search(int depth, int alpha, int beta) {
+// See https://www.chessprogramming.org/Negamax.
+Score Board::search(int depth, Score alpha, Score beta) {
     if (depth <= 0)
-        return quiescence(alpha, beta);
+        return quiescence(alpha, beta); 
 
     search_state.depth = depth;
-    int score = 0;
-    int static_eval = game_board.eval();
-    int old_alpha = alpha;
-    int best_score = -INF;
+    Score score = 0;
+    Score static_eval = game_board.eval();
+    Score old_alpha = alpha;
+    Score best_score = -INF;
     long moves_searched = 0;
     EntryType node_type = UPPER;    
 
@@ -165,27 +166,25 @@ int Board::search(int depth, int alpha, int beta) {
         || (entry->type == UPPER && entry->score < alpha))
         return entry->score;
     }
-
-    if (is_search_stopped()) return alpha;
-
+    
     bool can_prune = (depth <= 2) && !is_in_check;
-    int pruning_margin = 125 * depth * depth;
-
-    // Razoring
+    Score pruning_margin = 125 * depth * depth;
+    
+    // Razoring. See https://www.chessprogramming.org/Razoring.
     if (can_prune && static_eval + pruning_margin <= alpha)
         return quiescence(alpha, beta);
-
+    
     // Generate and sort moves
     generate_moves<ALLMOVES>();
     order_moves(entry ? entry->hash_move : nullmove);
-
+    
     // Handle game over
     if (is_draw()) return 0;
     if (winner() == opposition_colour(game_board.state.side_to_move)) return -INF;
 
-    if (search_state.ply+1 >= MAX_PLY) return static_eval;
-    
-    // Null move reduction
+    if (is_search_stopped()) return alpha;
+
+    // Null move reduction. See https://www.chessprogramming.org/Null_Move_Reductions.
     if (!is_in_check) {
         int reduction = depth > 6 ? 4 : 3;
         make_move(nullmove);
@@ -207,7 +206,7 @@ int Board::search(int depth, int alpha, int beta) {
         search_state.ply++;
         search_state.nodes++;
 
-        // Futility pruning
+        // Futility pruning. See https://www.chessprogramming.org/Futility_Pruning.
         if (can_prune && (node_type == EXACT) && !is_move(move, capture) && get_code(move) < npromo && !is_in_check) {
             if (eval() + pruning_margin <= alpha) {
                 search_state.ply--;
@@ -225,21 +224,25 @@ int Board::search(int depth, int alpha, int beta) {
         else {
             
             int reduction = 1;
-
-            if (moves_searched >= 3) {
-                // Late move reductions
+            
+            // Late move reductions. See https://www.chessprogramming.org/Late_Move_Reductions.
+            if (moves_searched >= 3 && depth > 3) {
                 if (moves_searched < 6) reduction = 2;
                 if (moves_searched >= 6) reduction = 3;
             }
 
             int reduced_depth = std::max(depth - reduction, 1);
 
-            // PVS search
-            score = -search(reduced_depth, -(alpha + 1), -alpha);
+            // PVS search. See https://www.chessprogramming.org/Principal_Variation_Search.
+            score = -search(depth - 1, -(alpha + 1), -alpha);
 
-            // Research
-            if (score > alpha && beta - alpha > 1)
+            // Research 
+            if (score > alpha && beta - alpha > 1) {
+                // beta - alpha > 1 prevents redundant research of Non-PV nodes.
+
+                researches++;
                 score = -search(depth - 1, -beta, -alpha);
+            }
         }
 
         search_state.ply--;
@@ -256,16 +259,17 @@ int Board::search(int depth, int alpha, int beta) {
 
         if (score >= beta) {
             node_type = LOWER;
-            if (!is_move(move, capture)) {
-                // Update killer moves
+            if (!is_move_capture(move)) {
+                // Update killer heuristics. See https://www.chessprogramming.org/Killer_Heuristic.
                 if (search_state.killer_moves[ply][1] == nullmove) {
                     search_state.killer_moves[ply][0] = search_state.killer_moves[ply][1];
                     search_state.killer_moves[ply][1] = move;
                 } else
                     search_state.killer_moves[ply][0] = move;
             } else {
-                int from = get_from_sq(move);
-                int to = get_to_sq(move);
+                // Update history heuristic. See https://www.chessprogramming.org/History_Heuristic.
+                Square from = get_from_sq(move);
+                Square to = get_to_sq(move);
                 search_state.history_moves[from][to][game_board.state.side_to_move] = depth * depth;
             }
 
@@ -315,12 +319,12 @@ int Board::search(int depth, int alpha, int beta) {
 
 void Board::run_search(SearchParams params) {
     g_search_params = &params;
-    int alpha = -INF, beta = INF;
+    Score alpha = -INF, beta = INF;
     search_state.start_time = std::chrono::steady_clock::now();
     int d = 1;
 
-    // Aspiration windows vars
-    int widening = 75, aw_fails_alpha = 0, aw_fails_beta = 0;
+    // Aspiration windows vars. See https://www.chessprogramming.org/Aspiration_Windows.
+    Score widening = 75, aw_fails_alpha = 0, aw_fails_beta = 0;
 
     // Decay history heuristic.
     for (int side = 0; side < 2; side++)
@@ -330,9 +334,10 @@ void Board::run_search(SearchParams params) {
 
     std::chrono::steady_clock::time_point depth_search_time = std::chrono::steady_clock::now();
     while (1) {
+        researches = 0;
         search_state.nodes = 0;
 
-        int score = search(d, alpha, beta);
+        Score score = search(d, alpha, beta);
         if (is_search_stopped()) break;
 
         // AW researches
@@ -355,7 +360,8 @@ void Board::run_search(SearchParams params) {
         alpha = score - 25;
         beta = score + 25;
 
-        std::cout << "info depth " << d << " nodes " << search_state.nodes << " time " << elapsed_ms(depth_search_time) << " score cp " << score << " pv ";
+        std::cout << "info depth " << d << " nodes " << search_state.nodes << " time " 
+        << elapsed_ms(depth_search_time) << " researches " << researches << " score cp " << score << " pv ";
         for (int i = 0; i < search_state.pv_length[0]; i++) {
             print_move(search_state.pv_table[i]);
             std::cout << " ";

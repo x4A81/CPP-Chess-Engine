@@ -36,8 +36,5 @@ target_compile_options(Engine PRIVATE
     $<$<CONFIG:Release>: -O3 -march=native -DNDEBUG>
 )
 
-# cmake -S "path to CMakeLists.txt" -B build -DCMAKE_BUILD_TYPE=Debug
-# or
-# cmake -S "path to CMakeLists.txt" -B build -DCMAKE_BUILD_TYPE=Release
-# then
-# cmake --build build
+# Compile using
+# "path to cmake exec" --build "path to build folder" --config Release

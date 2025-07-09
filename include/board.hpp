@@ -32,6 +32,11 @@ enum SquaresEncoding : Square {
     a8, b8, c8, d8, e8, f8, g8, h8, no_square
 };
 
+/// @brief Square helper.
+/// @param sq The square to flip.
+/// @return The reflected square across the rank axis.
+inline Square flip_rank(Square sq) { return sq ^ 56; }
+
 /// @brief Piece representation, also used for indexing.
 using Piece = int;
 enum PiecesEncoding : Piece {
@@ -122,7 +127,12 @@ inline Square get_to_sq(Move move) { return (move >> 6) & 0b111111; }
 /// @brief Move helper
 /// @param move Encoded move.
 /// @return The code of the move.
-inline Square get_code(Move move) { return move >> 12; }
+inline Code get_code(Move move) { return move >> 12; }
+
+/// @brief Move helper. Similar to is_move(Move, MoveCode) but includes promo captures.
+/// @param move Move to compare.
+/// @return true if move is capture.
+inline bool is_move_capture(Move move) { return get_code(move) & capture == capture; }
 
 constexpr int MAX_MOVE_LIST_SIZE = 256;
 
@@ -200,15 +210,22 @@ struct SearchParams;
 #define CAPTURES true
 #define ALLMOVES false
 
+using Score = int;
+
 class Board {
 private:
     vector<Board_State> prev_states;
     Move generate_move_nopromo(Square from_sq, Square to_sq);
-    int quiescence(int alpha, int beta);
-    int search(int depth, int alpha, int beta);
+    Score quiescence(Score alpha, Score beta);
+    Score search(int depth, Score alpha, Score beta);
     bool is_search_stopped();
     void order_moves(Move hash_move);
-
+    Score eval_pawns();
+    Score eval_knights();
+    Score eval_bishops();
+    Score eval_rooks();
+    Score eval_queens();
+    Score eval_kings();
 public:
     SearchState search_state;
     Board_State state;
@@ -243,7 +260,7 @@ public:
     void generate_moves();
     void make_move(Move move);
     void unmake_last_move();
-    int eval();
+    Score eval();
     void run_search(SearchParams params);
     bool is_draw();
     bool is_over();

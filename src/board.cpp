@@ -36,9 +36,9 @@ void Board::load_fen(string fen) {
             continue;
         } else {
             Piece piece_idx = char_to_piece(c);
-            Square csq = sq ^ 56;  
-            state.piece_list[csq] = piece_idx;
-            state.bitboards[piece_idx] |= bitboard_utils::mask(csq);
+            Square flip_sq = flip_rank(sq);  
+            state.piece_list[flip_sq] = piece_idx;
+            state.bitboards[piece_idx] |= bitboard_utils::mask(flip_sq);
             sq++;
         }
     }
