@@ -6,6 +6,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cassert>
 
 #define INF 100000
 #define NOT_USED -1;
@@ -25,12 +26,23 @@ struct SearchParams {
     // bool ponder = false;
 };
 
-inline int get_pv_index(int ply) { return (ply*(2*MAX_PLY+1-ply))/2; }
+/// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
+/// @param ply Ply of pv.
+/// @return The index to the pv table for ply.
+inline int get_pv_index(int ply) { assert(ply < MAX_PLY); return (ply*(2*MAX_PLY+1-ply))/2; }
+
+/// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
+/// @param ply Ply of pv.
+/// @return The index to the pv table for ply + 1.
 inline int get_next_pv_index(int ply) { return get_pv_index(ply) + MAX_PLY - ply; }
-inline int elapsed_ms(std::chrono::steady_clock::time_point time) {
+
+/// @brief Timer helper.
+/// @param start_time Time to compare against.
+/// @return The elasped time from start_time.
+inline int elapsed_ms(std::chrono::steady_clock::time_point start_time) {
     using namespace std::chrono;
     return static_cast<int>(duration_cast<milliseconds>(
-        steady_clock::now() - time
+        steady_clock::now() - start_time
     ).count());
 }
 

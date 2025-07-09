@@ -28,17 +28,17 @@ void stop_search() {
 
 Move parse_move_string(const string move_str) {
     Move move = nullmove;
-    int code = 0;
+    Code code = 0;
 
     Board_State state = game_board.state;
 
     int file = move_str[0] - 'a';
     int rank = move_str[1] - '1';
-    int from_sq = rank * 8 + file;
+    Square from_sq = rank * 8 + file;
 
     file = move_str[2] - 'a';
     rank = move_str[3] - '1';
-    int to_sq = rank * 8 + file;
+    Square to_sq = rank * 8 + file;
     move = from_sq | (to_sq << 6);
 
     bool is_pawn = (state.piece_list[from_sq] == P || state.piece_list[from_sq] == p);
@@ -92,8 +92,6 @@ void setup_engine() {
 
 void clean() {
     stop_flag = true;
-    // clear transpositoin table and search thread
-    // game_table.clear_tt();
 }
 
 void handle_go(const string& command) {
@@ -130,7 +128,7 @@ void handle_go(const string& command) {
 bool handle_command(const string& command) {
     if (command == "quit") {
         clean();
-        return false;
+        return true;
     }
 
     if (command == "uci")
@@ -207,5 +205,5 @@ bool handle_command(const string& command) {
 
     if (command == "d") game_board.print_board();
 
-    return true;
+    return false;
 }

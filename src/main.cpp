@@ -10,10 +10,10 @@ std::optional<Transposition> game_table;
 
 int main() {
     std::string line;
-    bool hasnt_recv_quit = true;
-    while (hasnt_recv_quit) {
+    bool quit = false;
+    while (!quit) {
         std::getline(std::cin, line);
-        hasnt_recv_quit = handle_command(line);
+        quit = handle_command(line);
     }
 
     clean();

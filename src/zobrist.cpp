@@ -24,8 +24,8 @@ void zobrist::init_keys() {
 
 KEY zobrist::gen_pos_key(Board_State& state) {
     KEY key = KEY(0);
-    for (int sq = 0; sq < 64; sq++) {
-        Pieces piece = state.piece_list.at(sq);
+    for (Square sq = 0; sq < 64; sq++) {
+        Piece piece = state.piece_list.at(sq);
         if (piece > 12)
             continue;
         key ^= piece_keys.at(piece * 64 + sq);

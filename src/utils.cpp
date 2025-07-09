@@ -2,26 +2,26 @@
 #include "../include/misc.hpp"
 #include <iostream>
 
-char piece_to_char(Pieces piece) {
+char piece_to_char(Piece piece) {
     std::string piece_chars = "pnbrqkPNBRQK";
-    return piece_chars.at(static_cast<int>(piece));
+    return piece_chars.at(piece);
 }
 
-Pieces char_to_piece(char c) {
+Piece char_to_piece(char c) {
     switch (c) {
-        case 'P': return Pieces::P;
-        case 'N': return Pieces::N;
-        case 'B': return Pieces::B;
-        case 'R': return Pieces::R;
-        case 'Q': return Pieces::Q;
-        case 'K': return Pieces::K;
-        case 'p': return Pieces::p;
-        case 'n': return Pieces::n;
-        case 'b': return Pieces::b;
-        case 'r': return Pieces::r;
-        case 'q': return Pieces::q;
-        case 'k': return Pieces::k;
-        default:  return Pieces::no_piece;
+        case 'p': return p;
+        case 'n': return n;
+        case 'b': return b;
+        case 'r': return r;
+        case 'q': return q;
+        case 'k': return k;
+        case 'P': return P;
+        case 'N': return N;
+        case 'B': return B;
+        case 'R': return R;
+        case 'Q': return Q;
+        case 'K': return K;
+        default:  return no_piece;
     }
 }
 
@@ -40,7 +40,7 @@ void print_bitboard(BB bb) {
     std::cout << "     a  b  c  d  e  f  g  h" << std::endl;
 }
 
-void print_piece_list(std::array<Pieces, 64> list) {
+void print_piece_list(std::array<Piece, 64> list) {
     for (int r = 7; r >= 0; r--) { // Loop over the ranks
         cout << "+---+---+---+---+---+---+---+---+" << endl;
         for (int f = 0; f < 8; f++) { // Loop over the files
@@ -58,17 +58,17 @@ void print_piece_list(std::array<Pieces, 64> list) {
     cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
 }
 
-std::string square_to_string(Squares sq) {
+std::string square_to_string(Square sq) {
     char file = 'a' + (sq & 7);
     char rank = '1' + (sq >> 3);
     return std::string() + file + rank;
 }
 
 void print_move(Move move) {
-    int from_sq = get_from_sq(move);
-    int to_sq = get_to_sq(move);
-    int code = get_code(move);
-    std::cout << square_to_string(Squares(from_sq)) << square_to_string(Squares(to_sq));
+    Square from_sq = get_from_sq(move);
+    Square to_sq = get_to_sq(move);
+    Code code = get_code(move);
+    std::cout << square_to_string(from_sq) << square_to_string(to_sq);
     switch (code) {
         case npromo:
         case c_npromo: std::cout << 'n'; break;

@@ -6,7 +6,7 @@ constexpr std::array<int, 12> material = { -100, -320, -330, -500, -900, -1000, 
 int Board::eval() {
     int score = 0;
 
-    for (Pieces piece : state.piece_list) {
+    for (Piece piece : state.piece_list) {
         if (piece > K) continue;
         score += material[piece];
     }

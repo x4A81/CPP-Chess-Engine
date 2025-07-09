@@ -11,9 +11,9 @@ using namespace std;
 // Clears board flags and bitboards, then resets flags to defaults
 void Board_State::reset() {
     fill(begin(bitboards), end(bitboards), 0ULL);
-    fill(begin(piece_list), end(piece_list), Pieces::no_piece);
-    enpassant_square = Squares::no_square;
-    side_to_move = Colours::no_colour;
+    fill(begin(piece_list), end(piece_list), no_piece);
+    enpassant_square = no_square;
+    side_to_move = no_colour;
     castling_rights = 0;
     halfmove_clock = 0;
     fullmove_counter = 1;
@@ -28,16 +28,16 @@ void Board::load_fen(string fen) {
 
     ss >> board_part >> stm >> castling >> enpassant >> halfmove >> fullmove;
 
-    int sq = 0;
+    Square sq = 0;
     for (char c : board_part) {
         if (isdigit(c)) {
             sq += c - '0';
         } else if (c == '/') {
             continue;
         } else {
-            int piece_idx = char_to_piece(c);
-            int csq = sq ^ 56;
-            state.piece_list[csq] = Pieces(piece_idx);
+            Piece piece_idx = char_to_piece(c);
+            Square csq = sq ^ 56;  
+            state.piece_list[csq] = piece_idx;
             state.bitboards[piece_idx] |= bitboard_utils::mask(csq);
             sq++;
         }
@@ -60,7 +60,7 @@ void Board::load_fen(string fen) {
     if (enpassant != "-") {
         int file = enpassant[0] - 'a';
         int rank = enpassant[1] - '1';
-        state.enpassant_square = Squares(file + 8 * rank);
+        state.enpassant_square = file + 8 * rank;
     } else {
         state.enpassant_square = no_square;
     }
@@ -97,16 +97,16 @@ void Board::print_board() {
 
     cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
     cout << "Side to move: " << ((state.side_to_move == white) ? "White" : "Black") << endl;
-    cout << "Castling rights: " << int(state.castling_rights) << endl;
+    cout << "Castling rights: " << state.castling_rights << endl;
     cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : square_to_string(state.enpassant_square)) << endl;
     cout << "Halfmove clock: " << state.halfmove_clock << endl;
     cout << "Fullmove counter: " << state.fullmove_counter << endl;
     cout << "Hash Key: " << state.hash_key << endl;
 }
 
-Move Board::generate_move_nopromo(int from_sq, int to_sq) {
+Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
     Move move = from_sq | (to_sq << 6);
-    int code = 0;
+    Code code = 0;
     bool is_pawn = (state.piece_list[from_sq] == P || state.piece_list[from_sq] == p);
     
     if (is_pawn && (to_sq - from_sq == 16 || to_sq - from_sq == -16))
@@ -234,7 +234,7 @@ void Board::generate_moves() {
     BB king_movement = king_move_table[king_sq] & ~(friendly_pieces | opp_any_attacks);
     if constexpr (GEN_CAPTURES) king_movement &= opponent_pieces;
     while (king_movement) {
-        int to_sq = pop_lsb(king_movement);
+        Square to_sq = pop_lsb(king_movement);
         state.move_list.add(generate_move_nopromo(king_sq, to_sq));
     }
 
@@ -246,10 +246,10 @@ void Board::generate_moves() {
     // Pinned knights cannot move
     BB knights = (state.bitboards[n] | state.bitboards[N]) & friendly_pieces & ~all_inbetween;
     while (knights) {
-        int from_sq = pop_lsb(knights);
+        Square from_sq = pop_lsb(knights);
         BB movement = knight_move_table[from_sq] & move_mask;
         while (movement) {
-            int to_sq = pop_lsb(movement);
+            Square to_sq = pop_lsb(movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -260,11 +260,11 @@ void Board::generate_moves() {
     // horizontal
     BB sliders = rooks & ~(all_inbetween ^ hor_inbetween);
     while (sliders) {
-        int from_sq = pop_lsb(sliders);
+        Square from_sq = pop_lsb(sliders);
 
         BB slider_movement = rook_moves(from_sq, occ) & move_mask & hor_fill(from_sq);
         while (slider_movement) {
-            int to_sq = pop_lsb(slider_movement);
+            Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -272,11 +272,11 @@ void Board::generate_moves() {
     // vertical
     sliders = rooks & ~(all_inbetween ^ ver_inbetween);
     while (sliders) {
-        int from_sq = pop_lsb(sliders);
+        Square from_sq = pop_lsb(sliders);
 
         BB slider_movement = rook_moves(from_sq, occ) & move_mask & ver_fill(from_sq);
         while (slider_movement) {
-            int to_sq = pop_lsb(slider_movement);
+            Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -287,11 +287,11 @@ void Board::generate_moves() {
     // Diagonal
     sliders = bishops & ~(all_inbetween ^ dia_inbetween);
     while (sliders) {
-        int from_sq = pop_lsb(sliders);
+        Square from_sq = pop_lsb(sliders);
 
         BB slider_movement = bishop_moves(from_sq, occ) & move_mask & dia_fill(from_sq);
         while (slider_movement) {
-            int to_sq = pop_lsb(slider_movement);
+            Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -299,11 +299,11 @@ void Board::generate_moves() {
     // Antidiagonal
     sliders = bishops & ~(all_inbetween ^ antdia_inbetween);
     while (sliders) {
-        int from_sq = pop_lsb(sliders);
+        Square from_sq = pop_lsb(sliders);
 
         BB slider_movement = bishop_moves(from_sq, occ) & move_mask & antdia_fill(from_sq);
         while (slider_movement) {
-            int to_sq = pop_lsb(slider_movement);
+            Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -315,10 +315,10 @@ void Board::generate_moves() {
     BB rank5 = 0x000000FF00000000ULL;
     BB dbl_rank = (state.side_to_move == white) ? rank4 : rank5;
     while (pawns) {
-        int from_sq = pop_lsb(pawns);
+        Square from_sq = pop_lsb(pawns);
 
         // Single push
-        int to_sq = from_sq - shifts[state.side_to_move];
+        Square to_sq = from_sq - shifts[state.side_to_move];
         if (get_bit(pawn_push_mask & move_mask, to_sq)) {
             if (to_sq >= a8 || to_sq <= h1) {
                 Move move_no_promo = generate_move_nopromo(from_sq, to_sq);
@@ -343,11 +343,11 @@ void Board::generate_moves() {
 
     BB attacking = pawns & ~(all_inbetween ^ dia_inbetween);
     while (attacking) {
-        int from_sq = pop_lsb(attacking);
+        Square from_sq = pop_lsb(attacking);
 
         BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & dia_fill(from_sq);
         while (movement_mask) {
-            int to_sq = pop_lsb(movement_mask);
+            Square to_sq = pop_lsb(movement_mask);
 
             if (to_sq == state.enpassant_square) {
                 if (null_if_check) {
@@ -376,11 +376,11 @@ void Board::generate_moves() {
 
     attacking = pawns & ~(all_inbetween ^ antdia_inbetween);
     while (attacking) {
-        int from_sq = pop_lsb(attacking);
+        Square from_sq = pop_lsb(attacking);
 
         BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & antdia_fill(from_sq);
         while (movement_mask) {
-            int to_sq = pop_lsb(movement_mask);
+            Square to_sq = pop_lsb(movement_mask);
 
             if (to_sq == state.enpassant_square) {
                 if (null_if_check) {
@@ -480,16 +480,16 @@ void Board::make_move(Move move) {
 
     if (move == nullmove) {
         if (state.side_to_move == black) state.fullmove_counter++;
-        state.side_to_move = Colours(int(state.side_to_move) ^ 1);
+        state.side_to_move = state.side_to_move ^ 1;
         key ^= zobrist::side_key;
         state.enpassant_square = no_square;
         state.halfmove_clock = 0;
         return;
     }
 
-    Squares from_sq = Squares(get_from_sq(move)), to_sq = Squares(get_to_sq(move));
-    Pieces piece = state.piece_list[from_sq];
-    int move_code = get_code(move);
+    Square from_sq = get_from_sq(move), to_sq = get_to_sq(move);
+    Piece piece = state.piece_list[from_sq];
+    Code move_code = get_code(move);
 
     // Remove piece from source
     pop_bit(state.bitboards[piece], from_sq);
@@ -498,24 +498,15 @@ void Board::make_move(Move move) {
 
     // Handle captures
     if (move_code == capture || move_code >= c_npromo) {
-        Pieces c_piece = state.piece_list[to_sq];
-        if (c_piece == no_piece) {
-            for (auto s : prev_states) {
-                print_piece_list(s.piece_list);
-                cout << endl;
-            }
-            print_move(move);
-            cout << endl;
-            print_board();
-        }
+        Piece c_piece = state.piece_list[to_sq];
         pop_bit(state.bitboards[c_piece], to_sq);
         key ^= zobrist::piece_keys[c_piece * 64 + to_sq];
     }
 
     // Handle en passant
     if (move_code == epcapture) {
-        int cap_sq = state.side_to_move == white ? state.enpassant_square - 8 : state.enpassant_square + 8;
-        Pieces cap_piece = state.side_to_move == white ? p : P;
+        Square cap_sq = state.side_to_move == white ? state.enpassant_square - 8 : state.enpassant_square + 8;
+        Piece cap_piece = state.side_to_move == white ? p : P;
         pop_bit(state.bitboards[cap_piece], cap_sq);
         state.piece_list[cap_sq] = no_piece;
         key ^= zobrist::piece_keys[cap_piece * 64 + cap_sq];
@@ -531,7 +522,7 @@ void Board::make_move(Move move) {
         pop_bit(state.bitboards[piece], to_sq);
         key ^= zobrist::piece_keys[piece * 64 + to_sq];
 
-        Pieces promo_piece;
+        Piece promo_piece;
         switch (move_code) {
             case npromo: case c_npromo: promo_piece = state.side_to_move == white ? N : n; break;
             case bpromo: case c_bpromo: promo_piece = state.side_to_move == white ? B : b; break;
@@ -587,7 +578,7 @@ void Board::make_move(Move move) {
     }
 
     if (move_code == dbpush) {
-        state.enpassant_square = state.side_to_move == white ? Squares(to_sq - 8) : Squares(to_sq + 8);
+        state.enpassant_square = state.side_to_move == white ? to_sq - 8 : to_sq + 8;
         key ^= zobrist::ep_file_key[state.enpassant_square & 7];
     } else {
         state.enpassant_square = no_square;
@@ -611,7 +602,7 @@ void Board::make_move(Move move) {
     if (state.side_to_move == black) state.fullmove_counter++;
     state.halfmove_clock = (move_code == capture || piece == p || piece == P) ? 0 : state.halfmove_clock + 1;
 
-    state.side_to_move = Colours(int(state.side_to_move) ^ 1);
+    state.side_to_move = state.side_to_move ^ 1;
     key ^= zobrist::side_key;
 
     // Recalculate all-piece sets
@@ -651,7 +642,7 @@ bool Board::is_over() {
     return false;
 }
 
-Colours Board::winner() {
+Colour Board::winner() {
     if (state.move_list.is_empty() && is_in_check) return opposition_colour(state.side_to_move);
     return no_colour;
 }

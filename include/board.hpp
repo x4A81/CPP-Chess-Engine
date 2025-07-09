@@ -9,19 +9,19 @@
 #include <vector>
 #include <chrono>
 
+using namespace std;
+
 class Board;
-
 extern Board game_board;
-
-#define CAPTURES true
-#define ALLMOVES false
 
 /// @brief Bitboard type
 using BB = uint64_t;
 
 // @brief encoded squares in 'Little-Endian Rank-File Mapping' format.
 // See https://www.chessprogramming.org/Square_Mapping_Considerations#Little-Endian_File-Rank_Mapping
-enum Squares : int {
+
+using Square = int;
+enum SquaresEncoding : Square {
     a1, b1, c1, d1, e1, f1, g1, h1,
     a2, b2, c2, d2, e2, f2, g2, h2,
     a3, b3, c3, d3, e3, f3, g3, h3,
@@ -32,40 +32,36 @@ enum Squares : int {
     a8, b8, c8, d8, e8, f8, g8, h8, no_square
 };
 
-/* Pieces indexes 
- 
-eg usage:
-board.bitboards[b] // get the black bishop bitboard)
-
-*/
-
-enum Pieces : int {
+/// @brief Piece representation, also used for indexing.
+using Piece = int;
+enum PiecesEncoding : Piece {
     p, n, b, r, q, k, P, N, B, R, Q, K, bpieces = 12, wpieces, allpieces, no_piece
 };
 
-enum Colours : int {
-    black, white, no_colour
+/// @brief Colour representation, also used for indexing.
+using Colour = int;
+enum ColoursEncoding : Colour {
+    black = 0, white = 1, no_colour = 2
 };
 
-inline Colours opposition_colour(Colours friendly_colour) {
+/// @brief Colour helper.
+/// @param friendly_colour Colour to get the opposite of.
+/// @return The opposite colour to friendly_colour, no_colour if friendly_colour is no_colour.
+inline Colour opposition_colour(Colour friendly_colour) {
     if (friendly_colour == no_colour) return no_colour;
-    return static_cast<Colours>(friendly_colour ^ 1);
+    return friendly_colour ^ 1;
 }
 
-/* Used for encoding castling rights:
-eg:
-
-int castling_rights = wking_side | wqueen_side;
-
-*/
-
-enum CastlingRights : int {
+/// @brief Castling rights encoder.
+using CastlingRights = int;
+enum CastlingRightsEncoder : CastlingRights {
     wking_side = 1,
     wqueen_side,
     bking_side = 4,
     bqueen_side = 8
 };
 
+/// @brief Castling rights helper.
 inline constexpr array<int, 64> castle_encoder = {
     13, 15, 15, 15, 12, 15, 15, 14,
     15, 15, 15, 15, 15, 15, 15, 15,
@@ -100,22 +96,40 @@ inline constexpr array<int, 64> castle_encoder = {
 using Move = uint16_t;
 #define nullmove 0
 
-enum MoveCode : int {
+using Code = int;
+
+enum MoveCode : Code {
     quiet, dbpush, kcastle, qcastle, capture, epcapture, 
     npromo = 8, bpromo, rpromo, qpromo, c_npromo, c_bpromo, c_rpromo, c_qpromo
 };
 
+/// @brief Move helper.
+/// @param move Move to compare.
+/// @param code Code to compare.
+/// @return If the move is of type code.
 inline bool is_move(Move move, MoveCode code)  { return (move >> 12) == code; }
-inline int get_from_sq(Move move) { return move & 0b111111; }
-inline int get_to_sq(Move move) { return (move >> 6) & 0b111111; }
-inline int get_code(Move move) { return move >> 12; }
+
+/// @brief Move helper
+/// @param move Encoded move.
+/// @return The from square of the move.
+inline Square get_from_sq(Move move) { return move & 0b111111; }
+
+/// @brief Move helper
+/// @param move Encoded move.
+/// @return The to square of the move.
+inline Square get_to_sq(Move move) { return (move >> 6) & 0b111111; }
+
+/// @brief Move helper
+/// @param move Encoded move.
+/// @return The code of the move.
+inline Square get_code(Move move) { return move >> 12; }
 
 constexpr int MAX_MOVE_LIST_SIZE = 256;
 
 class MoveList {
 private:
-    std::array<Move, MAX_MOVE_LIST_SIZE> _moves;
-    std::size_t _size;
+    array<Move, MAX_MOVE_LIST_SIZE> _moves;
+    size_t _size;
 
 public:
     void add(Move move) { _moves.at(_size++) = move; }
@@ -125,25 +139,25 @@ public:
         _size = 0;
     }
     
-    std::size_t size() { return _size; }
+    size_t size() { return _size; }
     auto begin() { return _moves.begin(); };
     auto end() { return _moves.begin() + _size; }
     bool is_empty() { return _size == 0 ? true : false; }
-    const Move& operator[](std::size_t idx) const {
+    const Move& operator[](size_t idx) const {
         return _moves[idx];
     }
 
-    Move& operator[](std::size_t idx) {
+    Move& operator[](size_t idx) {
         return _moves[idx];
     }
 };
 
 using KEY = uint64_t;
 struct Board_State {
-    std::array<BB, 15>bitboards{}; // p...kP...K black, white, all
-    std::array<Pieces, 64>piece_list{};
-    Squares enpassant_square;
-    Colours side_to_move;
+    array<BB, 15>bitboards{}; // p...kP...K black, white, all
+    array<Piece, 64>piece_list{};
+    Square enpassant_square;
+    Colour side_to_move;
     uint8_t castling_rights;
     int halfmove_clock;
     int fullmove_counter;
@@ -156,9 +170,9 @@ class Board;
 
 using KEY = uint64_t;
 namespace zobrist {
-    inline std::array<KEY, 768> piece_keys; // 12 * 64
-    inline std::array<KEY, 4> castling_keys;
-    inline std::array<KEY, 8> ep_file_key;
+    inline array<KEY, 768> piece_keys; // 12 * 64
+    inline array<KEY, 4> castling_keys;
+    inline array<KEY, 8> ep_file_key;
     inline KEY side_key;
 
     void init_keys();
@@ -166,27 +180,30 @@ namespace zobrist {
 }
 
 #define MAX_PLY 64
-#define MAX_DEPTH 10
+#define MAX_DEPTH 20
 #define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
 
 struct SearchState {
     int depth = 0;
     int ply = 0;
     long nodes = 0;
-    std::chrono::steady_clock::time_point start_time;
-    std::array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
-    std::array<int, MAX_PLY> pv_length = { 0 };
-    std::array<std::array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
-    std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
+    chrono::steady_clock::time_point start_time;
+    array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
+    array<int, MAX_PLY> pv_length = { 0 };
+    array<array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
+    array<array<array<int, 2>, 64>, 64> history_moves {};
     Move fallback_move = nullmove;
 };
 
 struct SearchParams;
 
+#define CAPTURES true
+#define ALLMOVES false
+
 class Board {
 private:
-    std::vector<Board_State> prev_states;
-    Move generate_move_nopromo(int from_sq, int to_sq);
+    vector<Board_State> prev_states;
+    Move generate_move_nopromo(Square from_sq, Square to_sq);
     int quiescence(int alpha, int beta);
     int search(int depth, int alpha, int beta);
     bool is_search_stopped();
@@ -204,7 +221,7 @@ public:
         prev_states.push_back(state);
     }
 
-    Board(std::string fen) {
+    Board(string fen) {
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen(fen);
@@ -219,7 +236,7 @@ public:
         zobrist::init_keys();
     }
 
-    void load_fen(std::string fen);
+    void load_fen(string fen);
     void print_board();
 
     template <bool GEN_CAPTURES>
@@ -230,7 +247,7 @@ public:
     void run_search(SearchParams params);
     bool is_draw();
     bool is_over();
-    Colours winner();
+    Colour winner();
 };
 
 #endif

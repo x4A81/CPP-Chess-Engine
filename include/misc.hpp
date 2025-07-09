@@ -1,14 +1,15 @@
 #ifndef BITBOARD_UTILS_HPP_INCLUDE
 #define BITBOARD_UTILS_HPP_INCLUDE
 
-using namespace std;
-
 #include <cstdint>
 #include <array>
 #include <bit>
 #include <cassert>
 
+using namespace std;
+
 using BB = uint64_t;
+using Square = int;
 
 namespace bitboard_utils {
 
@@ -98,29 +99,46 @@ namespace bitboard_utils {
     inline constexpr std::array<int, 16> shifts = { 8,  -8,  1,  -1,  9, 7,  -7,  -9,
                                          17, 10, -6, -15, 15, 6, -10, -17 };
     
-    /// @brief Mask the square to a bitboard
-    inline constexpr BB mask(int sq) { 
+    /// @brief Square masking helper.
+    /// @param sq Square to mask.
+    /// @return Bitboard of masked square.
+    inline constexpr BB mask(Square sq) { 
         assert(sq >= 0 && sq < 64); return BB(1) << sq; }
 
-    /// @brief Pop the bit at square in the bitboard
-    inline void pop_bit(BB& bb, int sq) { bb &= ~mask(sq); }
+    /// @brief Bit popper helper.
+    /// @param bb Reference to bitboard.
+    /// @param sq Square index in bitboard to pop.
+    inline void pop_bit(BB& bb, Square sq) { bb &= ~mask(sq); }
 
-    /// @brief Set the bit at square in the bitboard
-    inline void set_bit(BB& bb, int sq) { bb |= mask(sq); }
+    /// @brief Bit setter helper.
+    /// @param bb Reference to bitboard.
+    /// @param sq Square index in bitboard to pop.
+    inline void set_bit(BB& bb, Square sq) { bb |= mask(sq); }
 
-    /// @brief Get the bit at square in the bitboard
-    inline int get_bit(BB bb, int sq) { return (bb >> sq) & 1; }
+    /// @brief Bit getter helper.
+    /// @param bb Reference to bitboard.
+    /// @param sq Square index in bitboard to get.
+    /// @return 1 if bit is set, 0 if not set.
+    inline int get_bit(BB bb, Square sq) { return (bb >> sq) & 1; }
 
-    /// @brief Count the number of bits set in the bitboard
+    /// @brief Population counter helper.
+    /// @param bb Bitboard to count.
+    /// @return The number of set bits in bb.
     inline int pop_count(BB bb) { return popcount(bb); }
     
-    /// @brief Find the index of the least significant bit set in the bitboard
+    /// @brief Bit scanner helper.
+    /// @param bb Bitboard to scan.
+    /// @return The index of the least significant set bit in bb.
     inline int bitscan_forward(BB bb) { assert(bb != 0); return countr_zero(bb); }
     
-    /// @brief Find the index of the most significan set bit
+    /// @brief Bit scanner helper.
+    /// @param bb Bitboard to scan.
+    /// @return The index of the most significant set bit in bb.
     inline int bitscan_reverse(BB bb) { assert(bb != 0); return 63 - countl_zero(bb); }
 
-    /// @brief Pop the least significant bit from the bitboard and return its index
+    /// @brief Bit popper helper. Pops the least significant set bit and returns its index.
+    /// @param bb Reference to bitboard.
+    /// @return The index of the least significant set bit.
     inline int pop_lsb(BB& bb) {
         assert(bb != 0);
         int sq = countr_zero(bb);
@@ -128,46 +146,65 @@ namespace bitboard_utils {
         return sq;
     }
     
-    /// @brief Generalised shift for bitboards
+    /// @brief Generalised bit shifter. See https://www.chessprogramming.org/General_Setwise_Operations#Generalized_Shift.
+    /// @param bb Bitboard to shift.
+    /// @param dir Direction to shift.
+    /// @return The shifted bitboard.
     inline BB shift_one(BB bb, Dir dir) {
         int s = shifts[dir];
         return rotl(bb, s) & avoid_wraps[dir];
     }
 
-    /// @brief Generalised fill for sliding pieces, stopping at blockers
-    inline BB occ_fill(BB gen, BB pro, Dir dir) {
+    /// @brief Generalised fill with blockers helper. See https://www.chessprogramming.org/Kogge-Stone_Algorithm#Generalized_Rays.
+    /// @param bb Bitboard to fill.
+    /// @param occ Bitboard of blockers.
+    /// @param dir Direction to fill.
+    /// @return Filled bitboard.
+    inline BB occ_fill(BB bb, BB occ, Dir dir) {
         int s = shifts[dir];
-        pro &= avoid_wraps[dir];
-        gen |= pro & rotl(gen, s);
-        pro &= rotl(pro, s);
-        gen |= pro & rotl(gen, s*2);
-        pro &= rotl(pro, s*2);
-        gen |= pro & rotl(gen, s*3);
-        return gen;
+        occ &= avoid_wraps[dir];
+        bb |= occ & rotl(bb, s);
+        occ &= rotl(occ, s);
+        bb |= occ & rotl(bb, s*2);
+        occ &= rotl(occ, s*2);
+        bb |= occ & rotl(bb, s*3);
+        return bb;
     }
 
-    /// @brief Generalised sliding attacks, given a set of sliders and occupied squares
+    /// @brief Sliding attacks helper. See https://www.chessprogramming.org/Kogge-Stone_Algorithm#Generalized_Rays.
+    /// @param sliders Bitboard of sliders.
+    /// @param occ Bitboard of blockers.
+    /// @param dir Direction of moves.
+    /// @return Bitboard of sliding attacks.
     inline BB sliding_attacks(BB sliders, BB occ, Dir dir) {
         return shift_one(occ_fill(sliders, ~occ, dir), dir);
     }
 
-    /// @brief Fill horizontal
-    inline constexpr BB hor_fill(int sq) {
+    /// @brief Fill helper.
+    /// @param sq Square to fill on.
+    /// @return Bitboard of horizontal fill.
+    inline constexpr BB hor_fill(Square sq) {
         return precomp_hor_fill[sq];
     }
 
-    /// @brief Fill vertical
-    inline BB ver_fill(int sq) {
+    /// @brief Fill helper.
+    /// @param sq Square to fill on.
+    /// @return Bitboard of vertical fill.
+    inline BB ver_fill(Square sq) {
         return precomp_ver_fill[sq];
     }
 
-    /// @brief Fill diagonal
-    inline BB dia_fill(int sq) {
+    /// @brief Fill helper.
+    /// @param sq Square to fill on.
+    /// @return Bitboard of diagonal fill.
+    inline BB dia_fill(Square sq) {
         return precomp_dia_fill[sq];
     }
 
-    /// @brief Fill antidiagonal
-    inline BB antdia_fill(int sq) {
+    /// @brief Fill helper.
+    /// @param sq Square to fill on.
+    /// @return Bitboard of anti-diagonal fill.
+    inline BB antdia_fill(Square sq) {
         return precomp_antdia_fill[sq];
     }
 }
@@ -175,17 +212,23 @@ namespace bitboard_utils {
 namespace move_generator {
     using namespace bitboard_utils;
 
-    /// @brief Get white pawn attacks
+    /// @brief White pawn attacks helper. See https://www.chessprogramming.org/Pawn_Attacks_(Bitboards)#Attacks_2.
+    /// @param pawns Bitboard of pawns.
+    /// @return Bitboard of attacks.
     inline BB wpawn_attacks(BB pawns) {
         return ((pawns << 9) & nAFILE) | (pawns << 7) & nHFILE;
     }
 
-    /// @brief Get black pawn attacks
+    /// @brief Black pawn attacks helper. See https://www.chessprogramming.org/Pawn_Attacks_(Bitboards)#Attacks_2.
+    /// @param pawns Bitboard of pawns.
+    /// @return Bitboard of attacks.s
     inline BB bpawn_attacks(BB pawns) {
         return ((pawns >> 9) & nHFILE) | ((pawns >> 7) & nAFILE);
     }
 
-    /// @brief Get knight attacks
+    /// @brief Knight attacks helper. See https://www.chessprogramming.org/Knight_Pattern#Multiple_Knight_Attacks.
+    /// @param knights Bitboard of knights.
+    /// @return Bitboard of attacks.
     inline BB knight_attacks(BB knights) {
         BB l1 = (knights >> 1) & 0x7f7f7f7f7f7f7f7f;
         BB l2 = (knights >> 2) & 0x3f3f3f3f3f3f3f3f;
@@ -196,6 +239,9 @@ namespace move_generator {
         return (h1 << 16) | (h1 >> 16) | (h2 << 8) | (h2 >> 8);
     }
 
+    /// @brief King attacks helper. See https://www.chessprogramming.org/King_Pattern#by_Calculation.
+    /// @param kings Bitboard of kings.
+    /// @return Bitboard of attacks.
     inline BB king_attacks(BB kings) {
         BB attacks = ((kings >> 1) & nHFILE) | ((kings << 1) & nAFILE);
         kings |= attacks;
@@ -314,36 +360,36 @@ namespace move_generator {
     }
 
     /// @brief Generate blocked attacks for rook pieces
-    inline BB rook_blocked_attacks(int sq, BB occ) {
-        BB slider = bitboard_utils::mask(sq);
+    inline BB rook_blocked_attacks(Square sq, BB occ) {
+        BB slider = mask(sq);
         BB attacks = 0;
 
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::nort);
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::sout);
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::east);
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::west);
+        attacks |= sliding_attacks(slider, occ, nort);
+        attacks |= sliding_attacks(slider, occ, sout);
+        attacks |= sliding_attacks(slider, occ, east);
+        attacks |= sliding_attacks(slider, occ, west);
 
         return attacks;
     }
 
     /// @brief Generate blocked attacks for bishop pieces
-    inline BB bishop_blocked_attacks(int sq, BB occ) {
-        BB slider = bitboard_utils::mask(sq);
+    inline BB bishop_blocked_attacks(Square sq, BB occ) {
+        BB slider = mask(sq);
         BB attacks = 0;
 
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::noEast);
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::noWest);
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::soEast);
-        attacks |= sliding_attacks(slider, occ, bitboard_utils::soWest);
+        attacks |= sliding_attacks(slider, occ, noEast);
+        attacks |= sliding_attacks(slider, occ, noWest);
+        attacks |= sliding_attacks(slider, occ, soEast);
+        attacks |= sliding_attacks(slider, occ, soWest);
 
         return attacks;
     }
 
-    /// @brief Initialize sliding move tables for rooks and bishops
+    /// @brief Initialises movement tables for sliding pieces.
     inline void init_sliding_move_tables() {
         for (int sq = 0; sq < 64; sq++) {
             BB attack_mask = rook_movement_masks[sq];
-            int bits = bitboard_utils::pop_count(attack_mask);
+            int bits = pop_count(attack_mask);
             int variation_count = 1 << bits;
             for (int i = 0; i < variation_count; i++) {
                 BB variation = generate_variation_mask(i, bits, attack_mask);
@@ -352,7 +398,7 @@ namespace move_generator {
             }
 
             attack_mask = bishop_movement_masks[sq];
-            bits = bitboard_utils::pop_count(attack_mask);
+            bits = pop_count(attack_mask);
             variation_count = 1 << bits;
             for (int i = 0; i < variation_count; i++) {
                 BB variation = generate_variation_mask(i, bits, attack_mask);
@@ -362,30 +408,33 @@ namespace move_generator {
         }
     }
 
-    inline BB rook_moves(int sq, BB bb) {
-
-        // Gets rook moves for a given square and blocker bitboard.
-        
+    /// @brief Rook moves helper.
+    /// @param sq Rook square.
+    /// @param bb Bitboard of blockers.
+    /// @return Bitboard of moves.
+    inline BB rook_moves(Square sq, BB bb) {
         bb &= rook_movement_masks[sq];
         bb *= rook_magics[sq];
         bb >>= 64 - rook_shifts[sq];
         return rook_movement_table[sq][bb];
     }
 
-    inline BB bishop_moves(int sq, BB bb) {
-
-        // Gets bishop moves for a given square and blocker bitboard.
-
+    /// @brief Bishop moves helper.
+    /// @param sq Bishop square.
+    /// @param bb Bitboard of blockers.
+    /// @return Bitboard of moves.
+    inline BB bishop_moves(Square sq, BB bb) {
         bb &= bishop_movement_masks[sq];
         bb *= bishop_magics[sq];
         bb >>= 64 - bishop_shifts[sq];
         return bishop_movement_table[sq][bb];
     }
 
-    inline BB queen_moves(int sq, BB bb) {
-
-        // Gets queen moves for a given square and blocker bitboard.
-
+    /// @brief Queen moves helper.
+    /// @param sq Queen square.
+    /// @param bb Bitboard of blockers.
+    /// @return Bitboard of moves.
+    inline BB queen_moves(Square sq, BB bb) {
         return rook_moves(sq, bb) | bishop_moves(sq, bb);
     }
 } 

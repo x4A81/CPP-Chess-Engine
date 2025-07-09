@@ -8,6 +8,9 @@
 namespace tests {
     long positions_searched = 0;
     Board test_board;
+
+    /// @brief Runs a normal perft test on test_board. See https://www.chessprogramming.org/Perft#Perft_function.
+    /// @param depth Depth to test.
     void perft(int depth) {
         if (depth <= 0) {
             positions_searched++;
@@ -23,7 +26,10 @@ namespace tests {
         }
     }
 
-    void perft_test(int depth, int divide) {
+    /// @brief Runs a perft test with optional divide. See https://www.chessprogramming.org/Perft#Divide.
+    /// @param depth Depth to test.
+    /// @param divide If true, then run a perft divide test.
+    void perft_test(int depth, bool divide) {
         if (depth <= 0) {
             positions_searched++;
             return;
@@ -44,13 +50,19 @@ namespace tests {
         }
     }
 
+    /// @brief Runs a perft divide test.
+    /// @param depth Depth to test.
     void test(int depth) {
         positions_searched = 0;
-        perft_test(depth, 1);
+        perft_test(depth, true);
         std::cout << "Positions searched: " << positions_searched << std::endl;
     }
 
-    void test(int start, int stop, int divide = 1) {
+    /// @brief Runs a perft test, with optional divide.
+    /// @param start Depth to start test.
+    /// @param stop Depth to stop test.
+    /// @param divide If true, then run perft divide, default true.
+    void test(int start, int stop, bool divide = true) {
         for (int depth = start; depth <= stop; depth++) {
             std::cout << "Depth: " << depth << std::endl;
             positions_searched = 0;
@@ -59,6 +71,7 @@ namespace tests {
         }
     }
 
+    /// @brief Runs multiple perft tests on predetermined positions.
     void perft_suite() {
         std::cout << "Initial Position" << std::endl;
         test_board = Board(1);
@@ -77,6 +90,5 @@ namespace tests {
         test(1, 4, 0);
     }
 }
-
 
 #endif
