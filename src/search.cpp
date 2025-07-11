@@ -7,8 +7,8 @@
 #include <array>
 #include <cassert>
 
-const SearchParams* g_search_params = nullptr;
 long researches = 0;
+long tt_cuttoffs = 0;
 
 /// @brief Values for scoring captures. See https://www.chessprogramming.org/MVV-LVA.
 constexpr std::array<std::array<int, 6>, 5> MVV_LVA_table = {{
@@ -25,8 +25,8 @@ void Board::order_moves(Move hash_move) {
 
     std::vector<std::pair<Move, Score>> scored_moves(list.size());
     Move pv_move = search_state.pv_table[pv_index];
-    Move killer_0 = search_state.killer_moves[search_state.ply][0];
-    Move killer_1 = search_state.killer_moves[search_state.ply][1];
+    Move killer_0 = killer_moves[search_state.ply][0];
+    Move killer_1 = killer_moves[search_state.ply][1];
 
     /*
     Ranking of moves is as follows:
@@ -63,7 +63,7 @@ void Board::order_moves(Move hash_move) {
             else if (move == killer_1)
                 score = 600;
             else
-                score = search_state.history_moves[from][to][state.side_to_move];
+                score = history_moves[from][to][state.side_to_move];
 
             return {move, score};
         });
@@ -79,27 +79,25 @@ void Board::order_moves(Move hash_move) {
 }
 
 bool Board::is_search_stopped() {
-    if (stop_flag)
+    if (stop_flag.load())
         return true;
-    if (!g_search_params) // fallback, should not happen
-        return false;
 
     // Time check
-    if (g_search_params->move_time > 0) {
+    if (search_params.move_time > 0) {
         int elapsed = elapsed_ms(search_state.start_time);
-        if (elapsed >= g_search_params->move_time)
+        if (elapsed >= search_params.move_time)
             return true;
     }
 
     // Node check
-    if (g_search_params->nodes > 0 && search_state.nodes >= g_search_params->nodes)
+    if (search_params.nodes > 0 && search_state.nodes >= search_params.nodes)
         return true;
     
     // Depth check (current depth = root depth - ply)
-    if (g_search_params->max_depth > 0 && search_state.depth > g_search_params->max_depth)
+    if (search_params.max_depth > 0 && search_state.depth > search_params.max_depth)
         return true;
 
-    if (search_state.depth > MAX_DEPTH && !g_search_params->infinite)
+    if (search_state.depth > MAX_DEPTH && !search_params.infinite)
         return true;
 
     if (search_state.ply >= MAX_PLY) return true;
@@ -163,8 +161,10 @@ Score Board::search(int depth, Score alpha, Score beta) {
     if (entry && search_state.pv_table[pv_idx] != 0) {
         if ((entry->type == EXACT) 
         || (entry->type == LOWER && entry->score >= beta) 
-        || (entry->type == UPPER && entry->score < alpha))
-        return entry->score;
+        || (entry->type == UPPER && entry->score < alpha)) {
+            tt_cuttoffs++;
+            return entry->score;
+        }
     }
     
     bool can_prune = (depth <= 2) && !is_in_check;
@@ -257,16 +257,16 @@ Score Board::search(int depth, Score alpha, Score beta) {
             node_type = LOWER;
             if (!is_move_capture(move)) {
                 // Update killer heuristics. See https://www.chessprogramming.org/Killer_Heuristic.
-                if (search_state.killer_moves[ply][1] == nullmove) {
-                    search_state.killer_moves[ply][0] = search_state.killer_moves[ply][1];
-                    search_state.killer_moves[ply][1] = move;
+                if (killer_moves[ply][1] == nullmove) {
+                    killer_moves[ply][0] = killer_moves[ply][1];
+                    killer_moves[ply][1] = move;
                 } else
-                    search_state.killer_moves[ply][0] = move;
+                    killer_moves[ply][0] = move;
             } else {
                 // Update history heuristic. See https://www.chessprogramming.org/History_Heuristic.
                 Square from = get_from_sq(move);
                 Square to = get_to_sq(move);
-                search_state.history_moves[from][to][game_board.state.side_to_move] = depth * depth;
+                history_moves[from][to][game_board.state.side_to_move] = depth * depth;
             }
 
             // Add new entry
@@ -313,8 +313,7 @@ Score Board::search(int depth, Score alpha, Score beta) {
     return alpha;
 }
 
-void Board::run_search(SearchParams params) {
-    g_search_params = &params;
+void Board::run_search() {
     Score alpha = -INF, beta = INF;
     search_state.start_time = std::chrono::steady_clock::now();
     int d = 1;
@@ -326,14 +325,19 @@ void Board::run_search(SearchParams params) {
     for (int side = 0; side < 2; side++)
         for (int from = 0; from < 64; from++)
             for (int to = 0; to < 64; to++)
-                search_state.history_moves[from][to][side] /= 2;
+                history_moves[from][to][side] /= 2;
 
     std::chrono::steady_clock::time_point depth_search_time = std::chrono::steady_clock::now();
+    Score score;
+    array<Score, SEARCH_HELPER_THREADS> thread_scores {};
     while (1) {
         researches = 0;
+        tt_cuttoffs = 0;
         search_state.nodes = 0;
+        search_state.ply = 0;
 
-        Score score = search(d, alpha, beta);
+        score = search(d, alpha, beta);
+
         if (is_search_stopped()) break;
 
         // AW researches
@@ -359,7 +363,8 @@ void Board::run_search(SearchParams params) {
         beta = score + 25;
 
         std::cout << "info depth " << d << " nodes " << search_state.nodes << " time " 
-        << elapsed_ms(depth_search_time) << " researches " << researches << " score cp " << score << " pv ";
+        << elapsed_ms(depth_search_time) << " researches " << researches << " tt_cuttoffs " 
+        << tt_cuttoffs << " score cp " << score << " pv ";
         for (int i = 0; i < search_state.pv_length[0]; i++) {
             print_move(search_state.pv_table[i]);
             std::cout << " ";
@@ -369,7 +374,8 @@ void Board::run_search(SearchParams params) {
         
         depth_search_time = std::chrono::steady_clock::now();
         d++;
-        if (d > params.max_depth && params.max_depth > 0) break;
+        
+        if (d > search_params.max_depth && search_params.max_depth > 0) break;
     }
 
     std::cout << "bestmove ";
@@ -378,6 +384,5 @@ void Board::run_search(SearchParams params) {
     else
         print_move(search_state.pv_table[0]);
     std::cout << std::endl;
-    g_search_params = nullptr;
-    stop_flag = true;
+    stop_flag.store(true);
 }

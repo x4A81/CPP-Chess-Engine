@@ -91,7 +91,7 @@ void setup_engine() {
 }
 
 void clean() {
-    stop_flag = true;
+    stop_flag.store(true);
 }
 
 void handle_go(const string& command) {
@@ -120,8 +120,9 @@ void handle_go(const string& command) {
             params.inc = stoi(tokens[++i]);
     }
 
-    stop_flag = false;
-    thread search_thread([params]() { game_board.run_search(params); });
+    stop_flag.store(false);
+    game_board.search_params = params;
+    thread search_thread([params]() { game_board.run_search(); });
     search_thread.detach();
 }
 
@@ -135,7 +136,7 @@ bool handle_command(const string& command) {
         send_info();
 
     if (command == "stop")
-        stop_flag = true;
+        stop_flag.store(true);
 
     if (command == "isready") {
         setup_engine();

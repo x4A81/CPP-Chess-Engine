@@ -202,12 +202,25 @@ struct SearchState {
     chrono::steady_clock::time_point start_time;
     array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
     array<int, MAX_PLY> pv_length = { 0 };
-    array<array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
-    array<array<array<int, 2>, 64>, 64> history_moves {};
     Move fallback_move = nullmove;
 };
 
-struct SearchParams;
+#define UNUSED -1
+
+struct SearchParams {
+    int max_depth = 0;
+    int nodes = UNUSED;
+    int move_time = UNUSED;
+    int inc = UNUSED;
+    int total_time = UNUSED;
+    bool infinite = false;
+
+    SearchParams(const SearchParams&) = default;
+    SearchParams() = default;
+
+    // Unsupported
+    // bool ponder = false;
+};
 
 #define CAPTURES true
 #define ALLMOVES false
@@ -228,7 +241,9 @@ private:
     Score eval_rooks();
     Score eval_queens();
     Score eval_kings();
+
 public:
+    SearchParams search_params;
     SearchState search_state;
     Board_State state;
     bool is_in_check;
@@ -263,7 +278,7 @@ public:
     void make_move(Move move);
     void unmake_last_move();
     Score eval();
-    void run_search(SearchParams params);
+    void run_search();
     bool is_draw();
     bool is_over();
     Colour winner();

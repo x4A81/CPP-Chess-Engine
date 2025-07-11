@@ -9,22 +9,12 @@
 #include <cassert>
 
 #define INF 10000
-#define NOT_USED -1
+#define SEARCH_HELPER_THREADS 8
 
 inline std::atomic<bool> stop_flag;
-inline Transposition transposition_table;
 
-struct SearchParams {
-    int max_depth = 0;
-    int nodes = NOT_USED;
-    int move_time = NOT_USED;
-    int inc = NOT_USED;
-    int total_time = NOT_USED;
-    bool infinite = false;
-
-    // Unsupported
-    // bool ponder = false;
-};
+inline std::array<std::array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
+inline std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
 
 /// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
 /// @param ply Ply of pv.
