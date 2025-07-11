@@ -55,6 +55,7 @@ public:
     void clear_tt();
     TranspositionEntry* probe(KEY key, int depth);
     void store_entry(TranspositionEntry& entry);
+    float usage() const;
 };
 
 #endif

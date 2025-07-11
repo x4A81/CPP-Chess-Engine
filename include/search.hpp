@@ -8,8 +8,8 @@
 #include <chrono>
 #include <cassert>
 
-#define INF 100000
-#define NOT_USED -1;
+#define INF 10000
+#define NOT_USED -1
 
 inline std::atomic<bool> stop_flag;
 inline Transposition transposition_table;

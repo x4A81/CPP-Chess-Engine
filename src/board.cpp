@@ -132,8 +132,6 @@ Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
     
 }
 
-// Non sliding pieces attacks by calculation
-
 template <bool GEN_CAPTURES>
 void Board::generate_moves() {
 

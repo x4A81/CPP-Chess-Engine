@@ -11,7 +11,11 @@ void Transposition::init(std::size_t size) {
 
     if (size == 0) return;
 
-    size = std::clamp(size, MIN_TT_SIZE_MB, MAX_TT_SIZE_MB);
+    // Convert min and max TT entries:
+    constexpr size_t MIN_TT_ENTRIES = MIN_TT_SIZE;
+    constexpr size_t MAX_TT_ENTRIES = MAX_TT_SIZE;
+
+    size = std::clamp(size, MIN_TT_ENTRIES, MAX_TT_ENTRIES);
     std::size_t power = 1;
     while (power < size && (power << 1) > 0) power <<= 1; // Round up to nearest power of 2
     size = power;
@@ -55,4 +59,17 @@ void Transposition::store_entry(TranspositionEntry& entry) {
     int index = entry.key & (transposition_size - 1);
     TranspositionEntry *table_entry = &transposition_tt[index];
     *table_entry = entry;
+}
+
+float Transposition::usage() const {
+    if (!is_initialised || transposition_size == 0) return 0.0f;
+
+    size_t occupied = 0;
+    for (size_t i = 0; i < transposition_size; i++) {
+        if (transposition_tt[i].key != 0) {
+            occupied++;
+        }
+    }
+
+    return 100.0f * occupied / transposition_size;
 }

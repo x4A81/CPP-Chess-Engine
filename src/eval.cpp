@@ -1,89 +1,4 @@
-#include "../include/board.hpp"
-#include "../include/misc.hpp"
-#include <array>
-
-using namespace bitboard_utils;
-using namespace std;
-
-constexpr array<Score, 5> material = { 100, 320, 330, 500, 900 };
-
-constexpr array<Score, 64> pawn_psqt = {
-    0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    10, 10, 20, 30, 30, 20, 10, 10,
-    5,  5, 10, 25, 25, 10,  5,  5,
-    0,  0,  0, 20, 20,  0,  0,  0,
-    2, -5,-10, -2, -2,-10, -5,  2,
-    5, 10, 10,-20,-20, 10, 10,  5,
-    0,  0,  0,  0,  0,  0,  0,  0
-};
-
-constexpr array<Score, 64> knight_psqt = {
-    -50,-20,-30,-30,-30,-30,-20,-50,
-    -40,-20,  0,  0,  0,  0,-20,-40,
-    -30,  7, 13, 10, 10, 13,  7,-30,
-    -30,  2, 12, 17, 17, 12,  2,-30,
-    -30,  0, 12, 17, 17, 12,  0,-30,
-    -30,  7, 13, 10, 10, 13,  7,-30,
-    -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-20,-30,-30,-30,-30,-20,-50
-};
-
-constexpr array<Score, 64> bishop_psqt = {
-    -20,-10,-10,-10,-10,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5, 10, 10,  5,  0,-10,
-    -10,  5,  5, 10, 10,  5,  5,-10,
-    -10,  0, 12, 10, 10, 12,  0,-10,
-    -10, 10,  7, 12, 12,  7, 10,-10,
-    -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20
-};
-
-constexpr array<Score, 64> rook_psqt = {
-    0,  0,  0,  0,  0,  0,  0,  0,
-    5, 10, 10, 10, 10, 10, 10,  5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    0,  0,   0,  5,  5,  0,  0,  0
-};
-
-constexpr array<Score, 64> queen_psqt = {
-    -20,-10,-10, -5, -5,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5,  5,  5,  5,  0,-10,
-    -5,  0,  5,  5,  5,  5,  0, -5,
-        0,  0,  5,  5,  5,  5,  0, -5,
-    -10,  5,  5,  5,  5,  5,  0,-10,
-    -10,  0,  5,  0,  0,  0,  0,-10,
-    -20,-10,-10, -5, -5,-10,-10,-20
-};
-
-constexpr array<array<Score, 64>, 2> king_psqt = {{
-    {
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -30,-40,-40,-50,-50,-40,-40,-30,
-        -20,-30,-30,-40,-40,-30,-30,-20,
-        -10,-20,-20,-20,-20,-20,-20,-10,
-        20, 20, -5, -5, -5, -5, 20, 20,
-        20, 30, 10,  0,  0,  7, 27, 17
-    },
-    {
-        -50,-40,-30,-20,-20,-30,-40,-50,
-        -30,-20,-10,  0,  0,-10,-20,-30,
-        -30,-10, 20, 30, 30, 20,-10,-30,
-        -30,-10, 30, 40, 40, 30,-10,-30,
-        -30,-10, 30, 40, 40, 30,-10,-30,
-        -30,-10, 20, 30, 30, 20,-10,-30,
-        -30,-30,  0,  0,  0,  0,-30,-30,
-        -50,-30,-30,-30,-30,-30,-30,-50
-    }
-}};
+#include "../include/eval.hpp"
 
 Score Board::eval_pawns() {
     Score score = 0;
@@ -92,9 +7,11 @@ Score Board::eval_pawns() {
     BB bpawns = state.bitboards[p];
     BB copy_bb;
 
+    // Material.
     score += material[p] * pop_count(wpawns);  
     score -= material[p] * pop_count(bpawns);          
     
+    // PSQT.
     copy_bb = wpawns;
     while (copy_bb) {
         Square sq = pop_lsb(copy_bb);
@@ -106,6 +23,50 @@ Score Board::eval_pawns() {
         Square sq = pop_lsb(copy_bb);
         score -= pawn_psqt[sq];
     }
+
+    // Doubled.
+    BB wpawns_infront_behind = wpawns & wrear_span(wpawns);
+    BB bpawns_infront_behind = bpawns & brear_span(bpawns);
+
+    int num_doubled = pop_count(wpawns_infront_behind) / 2;
+    score += double_pawns_pen * num_doubled;
+
+    num_doubled = pop_count(bpawns_infront_behind) / 2;
+    score -= double_pawns_pen * num_doubled;
+
+    // Triples.
+    wpawns_infront_behind &= wpawns & wfront_span(wpawns);
+    bpawns_infront_behind &= bpawns & bfront_span(bpawns);
+
+    BB file_with_triple = file_fill(wpawns_infront_behind);
+
+    int num_tripled = pop_count(file_with_triple) / 3;
+    score += tripled_pawns_pen * num_tripled;
+
+    file_with_triple = file_fill(bpawns_infront_behind);
+    num_tripled = pop_count(file_with_triple) / 3;
+    score -= tripled_pawns_pen * num_tripled;
+
+    // Passed.
+    int num_passed = pop_count(wpassed_pawns(wpawns, bpawns));
+    score += num_passed * passed_pawn_bonus;
+
+    num_passed = pop_count(bpassed_pawns(bpawns, wpawns));
+    score -= num_passed * passed_pawn_bonus;
+
+    // Isolated.
+    int num_isolated = pop_count(isolanis(wpawns));
+    score += isolated_pawns_pen * num_isolated;
+
+    num_isolated = pop_count(isolanis(bpawns));
+    score -= isolated_pawns_pen * num_isolated;
+
+    // Half isolated.
+    int num_half_isolated = pop_count(half_isolanis(wpawns));
+    score += half_isolated_pawns_pen * num_half_isolated;
+
+    num_half_isolated = pop_count(half_isolanis(bpawns));
+    score -= half_isolated_pawns_pen * num_half_isolated;
 
     return score;
 }

@@ -132,7 +132,9 @@ inline Code get_code(Move move) { return move >> 12; }
 /// @brief Move helper. Similar to is_move(Move, MoveCode) but includes promo captures.
 /// @param move Move to compare.
 /// @return true if move is capture.
-inline bool is_move_capture(Move move) { return get_code(move) & capture == capture; }
+inline bool is_move_capture(Move move) { 
+    return is_move(move, capture) || get_code(move) >= c_npromo;
+}
 
 constexpr int MAX_MOVE_LIST_SIZE = 256;
 

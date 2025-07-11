@@ -190,14 +190,11 @@ Score Board::search(int depth, Score alpha, Score beta) {
         make_move(nullmove);
         search_state.ply++;
         search_state.nodes++;
-        score = -search(depth - reduction - 1, 0-beta, 1-beta);
+        score = -search(depth - reduction - 1, -beta, -(beta-1));
         search_state.ply--;
         unmake_last_move();
-        if (score >= beta) {
-            depth -= 4;
-            if (depth <= 0)
-                return quiescence(alpha, beta);
-        }
+        if (score >= beta)
+            return score;
     }
     
     for (Move move : game_board.state.move_list) {
@@ -207,7 +204,7 @@ Score Board::search(int depth, Score alpha, Score beta) {
         search_state.nodes++;
 
         // Futility pruning. See https://www.chessprogramming.org/Futility_Pruning.
-        if (can_prune && (node_type == EXACT) && !is_move(move, capture) && get_code(move) < npromo && !is_in_check) {
+        if (can_prune && (node_type == EXACT) && !is_move(move, capture) && get_code(move) < npromo) {
             if (eval() + pruning_margin <= alpha) {
                 search_state.ply--;
                 unmake_last_move();
@@ -217,7 +214,7 @@ Score Board::search(int depth, Score alpha, Score beta) {
 
         moves_searched++;
 
-        if (moves_searched == 1 || is_move(move, capture) || get_code(move) >= npromo || is_in_check)
+        if (moves_searched == 1 || is_move(move, capture) || get_code(move) >= npromo)
             // Do normal search if searching first few moves
             score = -search(depth - 1,  -beta, -alpha);
 
@@ -226,9 +223,8 @@ Score Board::search(int depth, Score alpha, Score beta) {
             int reduction = 1;
             
             // Late move reductions. See https://www.chessprogramming.org/Late_Move_Reductions.
-            if (moves_searched >= 3 && depth > 3) {
-                if (moves_searched < 6) reduction = 2;
-                if (moves_searched >= 6) reduction = 3;
+            if (moves_searched >= 3 && depth >= 3) {
+                reduction = std::max(int(moves_searched / 2 - 1), 2);
             }
 
             int reduced_depth = std::max(depth - reduction, 1);
@@ -324,7 +320,7 @@ void Board::run_search(SearchParams params) {
     int d = 1;
 
     // Aspiration windows vars. See https://www.chessprogramming.org/Aspiration_Windows.
-    Score widening = 75, aw_fails_alpha = 0, aw_fails_beta = 0;
+    Score widening = 100, aw_fails_alpha = 0, aw_fails_beta = 0;
 
     // Decay history heuristic.
     for (int side = 0; side < 2; side++)
@@ -343,13 +339,15 @@ void Board::run_search(SearchParams params) {
         // AW researches
         if (score <= alpha) {
             aw_fails_alpha++;
-            alpha -= widening * aw_fails_alpha;
+            alpha -= widening;
+            beta = score + widening;
             continue;
         }
 
         if (score >= beta) {
             aw_fails_beta++;
-            beta += widening * aw_fails_beta;
+            beta += widening;
+            alpha = score - widening;
             continue;
         }
 

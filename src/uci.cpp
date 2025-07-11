@@ -205,7 +205,9 @@ bool handle_command(const string& command) {
 
     if (command == "d") game_board.print_board();
 
-    if (command == "eval") cout << "CP: " << ((game_board.state.side_to_move == white) ? game_board.eval() : -game_board.eval()) << endl; // Negate the eval as view from white
+    if (command == "eval") cout << "info score cp " << ((game_board.state.side_to_move == white) ? game_board.eval() : -game_board.eval()) << endl; // Negate the eval as view from white
+
+    if (command == "usage") cout << "info usage " << game_table->usage() << "%"<< endl;
 
     return false;
 }
