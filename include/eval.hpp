@@ -96,6 +96,9 @@ constexpr Score passed_pawn_bonus = 17;
 constexpr Score isolated_pawns_pen = -10;
 constexpr Score half_isolated_pawns_pen = -4;
 
+constexpr Score open_file_rooks_bonus = 10;
+constexpr Score half_open_file_rooks_bonus = 5;
+
 inline BB north_fill(BB gen) {
     gen |= (gen << 8);
     gen |= (gen << 16);
@@ -148,5 +151,22 @@ inline BB half_isolanis(BB pawns) {
    return  no_neighbor_east_file(pawns)
          ^ no_neighbor_west_file(pawns);
 }
+
+inline BB open_file(BB wpanws, BB bpawns) {
+   return ~file_fill(wpanws) & ~file_fill(bpawns);
+}
+
+inline BB half_open_or_open(BB gen) { return ~file_fill(gen); }
+
+inline BB w_half_open_files(BB wpawns, BB bpawns) {
+   return half_open_or_open(wpawns)
+        ^ open_file(wpawns, bpawns);
+}
+
+inline BB b_half_open_files(BB wpawns, BB bpawns) {
+   return half_open_or_open(bpawns)
+        ^ open_file(wpawns, bpawns);
+}
+
 
 #endif

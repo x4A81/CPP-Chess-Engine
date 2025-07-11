@@ -128,9 +128,11 @@ Score Board::eval_rooks() {
     BB brooks = state.bitboards[r];
     BB copy_bb;
 
+    // Material.
     score += material[r] * pop_count(wrooks);
     score -= material[r] * pop_count(brooks);
 
+    // PSQT.
     copy_bb = wrooks;
     while (copy_bb) {
         Square sq = pop_lsb(copy_bb);
@@ -142,6 +144,22 @@ Score Board::eval_rooks() {
         Square sq = pop_lsb(copy_bb);
         score -= rook_psqt[sq];
     }
+
+    // Rooks on open files.
+    BB wpawns = state.bitboards[P];
+    BB bpawns = state.bitboards[p];
+    int num_rooks_on_open = pop_count(open_file(wpawns, bpawns) & wrooks);
+    score += open_file_rooks_bonus * num_rooks_on_open;
+
+    num_rooks_on_open = pop_count(open_file(wpawns, bpawns) & brooks);
+    score -= open_file_rooks_bonus * num_rooks_on_open;
+
+    // Rooks on semi-open files.
+    int num_rooks_on_semi_open = pop_count(w_half_open_files(wpawns, bpawns) & wrooks);
+    score += open_file_rooks_bonus * num_rooks_on_semi_open;
+
+    num_rooks_on_semi_open = pop_count(b_half_open_files(wpawns, bpawns) & brooks);
+    score -= open_file_rooks_bonus * num_rooks_on_semi_open;
 
     return score;
 }

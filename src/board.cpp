@@ -487,31 +487,41 @@ void Board::make_move(Move move) {
 
     Square from_sq = get_from_sq(move), to_sq = get_to_sq(move);
     Piece piece = state.piece_list[from_sq];
+    Colour piece_colour = piece <= 5 ? bpieces : wpieces;
     Code move_code = get_code(move);
+
+    Colour turn = state.side_to_move;
 
     // Remove piece from source
     pop_bit(state.bitboards[piece], from_sq);
+    pop_bit(state.bitboards[piece_colour], from_sq);
     key ^= zobrist::piece_keys[piece * 64 + from_sq];
     state.piece_list[from_sq] = no_piece;
 
     // Handle captures
     if (move_code == capture || move_code >= c_npromo) {
         Piece c_piece = state.piece_list[to_sq];
+        Colour c_piece_colour = c_piece <= 5 ? bpieces : wpieces;
         pop_bit(state.bitboards[c_piece], to_sq);
+        pop_bit(state.bitboards[c_piece_colour], to_sq);
+
         key ^= zobrist::piece_keys[c_piece * 64 + to_sq];
     }
 
     // Handle en passant
-    if (move_code == epcapture) {
-        Square cap_sq = state.side_to_move == white ? state.enpassant_square - 8 : state.enpassant_square + 8;
-        Piece cap_piece = state.side_to_move == white ? p : P;
+    else if (move_code == epcapture) {
+        Square cap_sq = turn == white ? state.enpassant_square - 8 : state.enpassant_square + 8;
+        Piece cap_piece = turn == white ? p : P;
+        Colour c_piece_colour = turn ^ 1;
         pop_bit(state.bitboards[cap_piece], cap_sq);
+        pop_bit(state.bitboards[c_piece_colour], cap_sq);
         state.piece_list[cap_sq] = no_piece;
         key ^= zobrist::piece_keys[cap_piece * 64 + cap_sq];
     }
 
     // Move piece to destination
     set_bit(state.bitboards[piece], to_sq);
+    set_bit(state.bitboards[piece_colour], to_sq);
     key ^= zobrist::piece_keys[piece * 64 + to_sq];
     state.piece_list[to_sq] = piece;
 
@@ -522,10 +532,10 @@ void Board::make_move(Move move) {
 
         Piece promo_piece;
         switch (move_code) {
-            case npromo: case c_npromo: promo_piece = state.side_to_move == white ? N : n; break;
-            case bpromo: case c_bpromo: promo_piece = state.side_to_move == white ? B : b; break;
-            case rpromo: case c_rpromo: promo_piece = state.side_to_move == white ? R : r; break;
-            case qpromo: case c_qpromo: promo_piece = state.side_to_move == white ? Q : q; break;
+            case npromo: case c_npromo: promo_piece = turn == white ? N : n; break;
+            case bpromo: case c_bpromo: promo_piece = turn == white ? B : b; break;
+            case rpromo: case c_rpromo: promo_piece = turn == white ? R : r; break;
+            case qpromo: case c_qpromo: promo_piece = turn == white ? Q : q; break;
         }
 
         set_bit(state.bitboards[promo_piece], to_sq);
@@ -534,19 +544,23 @@ void Board::make_move(Move move) {
     }
 
     // Castling
-    if (move_code == kcastle || move_code == qcastle) {
+    else if (move_code == kcastle || move_code == qcastle) {
         if (state.side_to_move == white) {
             if (move_code == kcastle) {
                 pop_bit(state.bitboards[R], h1);
+                pop_bit(state.bitboards[piece_colour], h1);
                 key ^= zobrist::piece_keys[R * 64 + h1];
                 set_bit(state.bitboards[R], f1);
+                set_bit(state.bitboards[piece_colour], f1);
                 key ^= zobrist::piece_keys[R * 64 + f1];
                 state.piece_list[h1] = no_piece;
                 state.piece_list[f1] = R;
             } else {
                 pop_bit(state.bitboards[R], a1);
+                pop_bit(state.bitboards[piece_colour], a1);
                 key ^= zobrist::piece_keys[R * 64 + a1];
                 set_bit(state.bitboards[R], d1);
+                set_bit(state.bitboards[piece_colour], d1);
                 key ^= zobrist::piece_keys[R * 64 + d1];
                 state.piece_list[a1] = no_piece;
                 state.piece_list[d1] = R;
@@ -554,15 +568,19 @@ void Board::make_move(Move move) {
         } else {
             if (move_code == kcastle) {
                 pop_bit(state.bitboards[r], h8);
+                pop_bit(state.bitboards[piece_colour], h8);
                 key ^= zobrist::piece_keys[r * 64 + h8];
                 set_bit(state.bitboards[r], f8);
+                set_bit(state.bitboards[piece_colour], f8);
                 key ^= zobrist::piece_keys[r * 64 + f8];
                 state.piece_list[h8] = no_piece;
                 state.piece_list[f8] = r;
             } else {
                 pop_bit(state.bitboards[r], a8);
+                pop_bit(state.bitboards[piece_colour], a8);
                 key ^= zobrist::piece_keys[r * 64 + a8];
                 set_bit(state.bitboards[r], d8);
+                set_bit(state.bitboards[piece_colour], d8);
                 key ^= zobrist::piece_keys[r * 64 + d8];
                 state.piece_list[a8] = no_piece;
                 state.piece_list[d8] = r;
@@ -597,17 +615,13 @@ void Board::make_move(Move move) {
     if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
 
     // Update counters and side to move
-    if (state.side_to_move == black) state.fullmove_counter++;
+    if (turn == black) state.fullmove_counter++;
     state.halfmove_clock = (move_code == capture || piece == p || piece == P) ? 0 : state.halfmove_clock + 1;
 
-    state.side_to_move = state.side_to_move ^ 1;
+    state.side_to_move = turn ^ 1;
     key ^= zobrist::side_key;
 
     // Recalculate all-piece sets
-    state.bitboards[12] = state.bitboards[p] | state.bitboards[n] | state.bitboards[b] |
-                          state.bitboards[r] | state.bitboards[q] | state.bitboards[k];
-    state.bitboards[13] = state.bitboards[P] | state.bitboards[N] | state.bitboards[B] |
-                          state.bitboards[R] | state.bitboards[Q] | state.bitboards[K];
     state.bitboards[14] = state.bitboards[12] | state.bitboards[13];
 }
 
@@ -619,7 +633,6 @@ void Board::unmake_last_move() {
 }
 
 bool Board::is_draw() {
-    if (state.move_list.is_empty() && !is_in_check) return true;
     if (state.halfmove_clock >= 50) return true;
 
     int repetition_count = 1; // include current state
