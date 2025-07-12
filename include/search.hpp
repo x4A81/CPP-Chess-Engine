@@ -15,8 +15,6 @@ inline std::atomic<bool> stop_flag;
 
 inline std::array<std::array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
 inline std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
-inline std::array<Move, PV_TABLE_SIZE> prev_pv_table { nullmove };
-
 
 /// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
 /// @param ply Ply of pv.

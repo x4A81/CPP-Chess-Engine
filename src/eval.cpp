@@ -128,11 +128,9 @@ Score Board::eval_rooks() {
     BB brooks = state.bitboards[r];
     BB copy_bb;
 
-    // Material.
     score += material[r] * pop_count(wrooks);
     score -= material[r] * pop_count(brooks);
 
-    // PSQT.
     copy_bb = wrooks;
     while (copy_bb) {
         Square sq = pop_lsb(copy_bb);

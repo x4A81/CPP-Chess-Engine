@@ -232,7 +232,7 @@ private:
     vector<Board_State> prev_states;
     Move generate_move_nopromo(Square from_sq, Square to_sq);
     Score quiescence(Score alpha, Score beta);
-    Score search(int depth, Score alpha, Score beta, bool pv_node);
+    Score search(int depth, Score alpha, Score beta);
     bool is_search_stopped();
     void order_moves(Move hash_move);
     Score eval_pawns();
