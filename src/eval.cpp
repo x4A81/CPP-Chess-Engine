@@ -1,6 +1,9 @@
 #include "../include/eval.hpp"
 
 Score Board::eval_pawns() {
+    bool is_endgame = 
+    pop_count(state.bitboards[allpieces] ^ (state.bitboards[p] | state.bitboards[P] | state.bitboards[k] | state.bitboards[K]))
+    <= 7;
     Score score = 0;
 
     BB wpawns = state.bitboards[P];
@@ -12,16 +15,17 @@ Score Board::eval_pawns() {
     score -= material[p] * pop_count(bpawns);          
     
     // PSQT.
+    int table = is_endgame ? 1 : 0;
     copy_bb = wpawns;
     while (copy_bb) {
         Square sq = pop_lsb(copy_bb);
-        score += pawn_psqt[flip_rank(sq)];
+        score += pawn_psqt[table][flip_rank(sq)];
     }
 
     copy_bb = bpawns;
     while (copy_bb) {
         Square sq = pop_lsb(copy_bb);
-        score -= pawn_psqt[sq];
+        score -= pawn_psqt[table][sq];
     }
 
     // Doubled.

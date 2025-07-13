@@ -8,8 +8,8 @@
 using namespace std;
 using namespace bitboard_utils;
 
-#define DBL_PAWNS_PEN -10
-#define TRI_PAWNS_PEN -12
+#define DBL_PAWNS_PEN -8
+#define TRI_PAWNS_PEN -10
 #define PASS_PAWNS_BONUS 17
 #define ISO_PAWNS_PEN -10
 #define HALF_ISO_PAWNS_PEN -4
@@ -19,16 +19,28 @@ using namespace bitboard_utils;
 
 constexpr array<Score, 5> material = { 100, 320, 330, 500, 900 };
 
-constexpr array<Score, 64> pawn_psqt = {
-    0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    10, 10, 20, 30, 30, 20, 10, 10,
-    5,  5, 10, 25, 25, 10,  5,  5,
-    0,  0,  0, 20, 20,  0,  0,  0,
-    2, -5,-10, -5, -5, -7, -5,  2,
-    5, 10, 10,-20,-20, 10, 10,  5,
-    0,  0,  0,  0,  0,  0,  0,  0
-};
+constexpr array<array<Score, 64>, 2> pawn_psqt = {{
+    {
+         0,  0,  0,  0,  0,  0,  0,  0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+         5,  5, 10, 25, 25, 10,  5,  5,
+         0,  0,  0, 20, 20,  0,  0,  0,
+         2, -5,-10, -5, -5, -7, -5,  2,
+         5, 10, 10,-20,-20, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0
+    },
+    {
+         0,  0,  0,  0,  0,  0,  0,  0,
+        80, 90, 90, 90, 90, 90, 90, 80,
+        70, 80, 80, 80, 80, 80, 80, 70,
+        60, 70, 70, 70, 70, 70, 70, 60,
+        55, 55, 55, 55, 55, 55, 55, 55,
+        50, 50, 50, 50, 50, 50, 50, 50,
+         0,  0,  0,  0,  0,  0,  0,  0,
+         0,  0,  0,  0,  0,  0,  0,  0
+    }
+}};
 
 constexpr array<Score, 64> knight_psqt = {
     -50,-20,-30,-30,-30,-30,-20,-50,

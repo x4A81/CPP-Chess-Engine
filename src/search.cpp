@@ -91,17 +91,27 @@ bool Board::is_search_stopped() {
 
 // See https://www.chessprogramming.org/Quiescence_Search.
 Score Board::quiescence(Score alpha, Score beta, int ply) {
-    Score stand_pat = eval();
-    Score best_val = stand_pat;
-    if (stand_pat >= beta) return stand_pat;
-    if (stand_pat > alpha) alpha = stand_pat;
 
-    generate_moves<CAPTURES>();
+    Score best_val = alpha;
+    bool check_flag = true;
+    if (!is_side_in_check(state.side_to_move)) {
+        check_flag = false;
+        Score stand_pat = eval();
+        best_val = stand_pat;
+        if (stand_pat >= beta) return stand_pat;
+        if (stand_pat > alpha) alpha = stand_pat;
+      //  generate_moves<CAPTURES>(); // BUGS IN CAPTURE GEN
+    }
+
+    //else
+    generate_moves<ALLMOVES>();
+
     order_moves(nullmove, ply);
     
     if (is_search_stopped()) return best_val; 
     
     for (Move move : state.move_list) {
+        if (!is_move_capture(move) && !check_flag) continue;
         make_move(move);
         nodes++;
 
@@ -220,7 +230,7 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
     TranspositionEntry *entry = game_table->probe(state.hash_key, depth);
 
     // Ensures that pv is not shortened
-    if (entry != nullptr) {
+    if (entry != nullptr && pv_table[pv_idx] != nullmove) {
 
         // In pv nodes, only return if hit is exact.
         EntryType ent = entry->type;
@@ -456,14 +466,14 @@ void Board::run_search() {
         
         depth_search_time = std::chrono::steady_clock::now();
         d++;
-        if (d > search_params.max_depth && search_params.max_depth > 0) break;
         prev_pv_table = pv_table;
+        if (d > search_params.max_depth && search_params.max_depth > 0) break;
         pv_table.fill(nullmove);
         pv_length.fill(0);
     }
 
     std::cout << "bestmove ";
-    print_move(pv_table[0]);
+    print_move(prev_pv_table[0]);
     std::cout << std::endl;
     stop_flag.store(true);
 }
