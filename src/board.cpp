@@ -102,6 +102,7 @@ void Board::print_board() {
     cout << "Halfmove clock: " << state.halfmove_clock << endl;
     cout << "Fullmove counter: " << state.fullmove_counter << endl;
     cout << "Hash Key: " << state.hash_key << endl;
+    cout << "Checked: " << state.is_in_check << endl;
 }
 
 Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
@@ -130,6 +131,64 @@ Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
 
     return move | (code << 12);
     
+}
+
+bool Board::is_side_in_check(Colour side) {
+    BB white_mask = -(side == white); // All 1s if white to move, else 0s
+    BB black_mask = ~white_mask;
+
+    BB wh = state.bitboards[wpieces];
+    BB bl = state.bitboards[bpieces];
+    BB occ = state.bitboards[allpieces];
+
+    BB opponent_pieces = (bl & white_mask) | (wh & black_mask); // isolates opponent pieces
+
+    // Check mask
+    BB friendly_pieces = (bl & black_mask) | (wh & white_mask);
+    BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
+    BB opp_any_attacks = 0;
+    int king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
+    BB kingBB = mask(king_sq);
+    BB opp_attacks = 0;
+
+    BB opp_rooks = (state.bitboards[r] | state.bitboards[R] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
+    
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, west);
+    opp_any_attacks |= opp_attacks;
+
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, east);
+    opp_any_attacks |= opp_attacks;
+
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, nort);
+    opp_any_attacks |= opp_attacks;
+
+    opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, sout);
+    opp_any_attacks |= opp_attacks;
+    
+    BB opp_bishops = (state.bitboards[b] | state.bitboards[B] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
+    
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, noEast);
+    opp_any_attacks |= opp_attacks;
+
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, soWest);
+    opp_any_attacks |= opp_attacks;
+
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, soEast);
+    opp_any_attacks |= opp_attacks;
+
+    opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, noWest);
+    opp_any_attacks |= opp_attacks;
+
+    // Non-sliding pieces
+    opp_any_attacks |= knight_attacks((state.bitboards[n] | state.bitboards[N]) & opponent_pieces);
+    opp_any_attacks |= king_attacks((state.bitboards[k] | state.bitboards[K]) & opponent_pieces);
+    
+    if (state.side_to_move == white)
+        opp_any_attacks |= bpawn_attacks(state.bitboards[p]);
+    else
+        opp_any_attacks |= wpawn_attacks(state.bitboards[P]);
+
+    return opp_any_attacks & kingBB;
 }
 
 template <bool GEN_CAPTURES>
@@ -236,7 +295,7 @@ void Board::generate_moves() {
         state.move_list.add(generate_move_nopromo(king_sq, to_sq));
     }
 
-    is_in_check = !null_if_check;
+    state.is_in_check = null_if_check == 0;
     
     // If dbl check only king moves are allowed
     if (move_mask == 0) return;
@@ -632,7 +691,7 @@ void Board::unmake_last_move() {
     }
 }
 
-bool Board::is_draw() {
+bool Board::is_rep() {
     if (state.halfmove_clock >= 50) return true;
 
     int repetition_count = 1; // include current state
@@ -642,18 +701,7 @@ bool Board::is_draw() {
             repetition_count++;
     }
 
-    if (repetition_count >= 3) return true;
+    if (repetition_count > 2) return true;
 
     return false;
-}
-
-bool Board::is_over() {
-    if (state.move_list.is_empty() || is_draw());
-        return true;
-    return false;
-}
-
-Colour Board::winner() {
-    if (state.move_list.is_empty() && is_in_check) return opposition_colour(state.side_to_move);
-    return no_colour;
 }

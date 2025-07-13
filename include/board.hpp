@@ -147,14 +147,14 @@ public:
     void add(Move move) { _moves.at(_size++) = move; }
 
     void clear() {
-        _moves.fill(0);
+        _moves.fill(nullmove);
         _size = 0;
     }
     
     size_t size() { return _size; }
     auto begin() { return _moves.begin(); };
     auto end() { return _moves.begin() + _size; }
-    bool is_empty() { return _size == 0 ? true : false; }
+    bool is_empty() { return _size == 0; }
     const Move& operator[](size_t idx) const {
         return _moves[idx];
     }
@@ -175,6 +175,7 @@ struct Board_State {
     int fullmove_counter;
     KEY hash_key;
     MoveList move_list;
+    bool is_in_check;
     void reset();
 };
 
@@ -190,20 +191,6 @@ namespace zobrist {
     void init_keys();
     KEY gen_pos_key(Board_State& state);
 }
-
-#define MAX_PLY 64
-#define MAX_DEPTH 20
-#define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
-
-struct SearchState {
-    int depth = 0;
-    int ply = 0;
-    long nodes = 0;
-    chrono::steady_clock::time_point start_time;
-    array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
-    array<int, MAX_PLY> pv_length = { 0 };
-    Move fallback_move = nullmove;
-};
 
 #define UNUSED -1
 
@@ -231,10 +218,11 @@ class Board {
 private:
     vector<Board_State> prev_states;
     Move generate_move_nopromo(Square from_sq, Square to_sq);
-    Score quiescence(Score alpha, Score beta);
-    Score search(int depth, Score alpha, Score beta);
+    Score quiescence(Score alpha, Score beta, int ply);
+    Score search(int depth, int ply, Score alpha, Score beta, bool is_pv_node, bool null_move_allowed = true);
+    Score search_root(int depth, Score alpha, Score beta);
     bool is_search_stopped();
-    void order_moves(Move hash_move);
+    void order_moves(Move hash_move, int ply);
     Score eval_pawns();
     Score eval_knights();
     Score eval_bishops();
@@ -244,9 +232,7 @@ private:
 
 public:
     SearchParams search_params;
-    SearchState search_state;
     Board_State state;
-    bool is_in_check;
 
     Board() {
         move_generator::init_sliding_move_tables();
@@ -275,13 +261,12 @@ public:
 
     template <bool GEN_CAPTURES>
     void generate_moves();
+    bool is_side_in_check(Colour side);
     void make_move(Move move);
     void unmake_last_move();
     Score eval();
     void run_search();
-    bool is_draw();
-    bool is_over();
-    Colour winner();
+    bool is_rep();
 };
 
 #endif

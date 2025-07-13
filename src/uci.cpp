@@ -3,6 +3,7 @@
 #include "../include/board.hpp"
 #include "../include/search.hpp"
 #include "../include/transposition.hpp"
+#include "../include/tests.hpp"
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -97,6 +98,8 @@ void clean() {
 void handle_go(const string& command) {
     SearchParams params;
     vector<string> tokens = get_tokens(command);
+    bool go_perft = false;
+    int perft_depth = 0;
 
     if (tokens.size() == 1) return;
 
@@ -118,6 +121,16 @@ void handle_go(const string& command) {
             params.inc = stoi(tokens[++i]);
         else if (tok == "binc" && i + 1 < tokens.size())
             params.inc = stoi(tokens[++i]);
+        else if (tok == "perft" && i + 1 < tokens.size()) {
+            perft_depth = stoi(tokens[++i]);
+            go_perft = true;
+        }
+    }
+
+    if (go_perft) {
+        tests::test_board = game_board;
+        tests::test(perft_depth);
+        return;
     }
 
     stop_flag.store(false);
