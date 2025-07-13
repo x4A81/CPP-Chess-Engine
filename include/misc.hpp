@@ -207,6 +207,31 @@ namespace bitboard_utils {
     inline BB antdia_fill(Square sq) {
         return precomp_antdia_fill[sq];
     }
+
+    /// @brief Fill helper.
+    /// @param gen Starting Bitboard.
+    /// @return Bitboard of all bits smeared north.
+    inline BB north_fill(BB gen) {
+        gen |= (gen << 8);
+        gen |= (gen << 16);
+        gen |= (gen << 32);
+        return gen;
+    }
+
+    /// @brief Fill helper.
+    /// @param gen Starting Bitboard.
+    /// @return Bitboard of all bits smeared south.
+    inline BB south_fill(BB gen) {
+        gen |= (gen >> 8);
+        gen |= (gen >> 16);
+        gen |= (gen >> 32);
+        return gen;
+    }
+
+    /// @brief Fill helper.
+    /// @param gen Starting Bitboard.
+    /// @return Bitboard of all bits smeared north and south.
+    inline BB file_fill(BB gen) { return north_fill(gen) | south_fill(gen); }
 }
 
 namespace move_generator {

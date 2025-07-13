@@ -3,9 +3,6 @@
 #include "../include/utils.hpp"
 #include "../include/transposition.hpp"
 #include <iostream>
-#include <algorithm>
-#include <array>
-#include <cassert>
 
 long researches = 0;
 long tt_cuttoffs = 0;

@@ -64,11 +64,11 @@ These two functions were taken from this discussion:
 https://talkchess.com/viewtopic.php?t=74411
 */
 
-inline int score_to_tt(int score, int ply) { 
+inline Score score_to_tt(Score score, int ply) { 
     return (score > MATE_VALUE) ? score + ply : (score < MATE_VALUE) ? score - ply : score; 
 }
 
-inline int score_from_tt(int score, int ply) {
+inline Score score_from_tt(Score score, int ply) {
     return (score > MATE_VALUE) ? score - ply : (score < MATE_VALUE) ? score + ply : score; 
 }
 

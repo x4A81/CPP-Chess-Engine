@@ -8,6 +8,15 @@
 using namespace std;
 using namespace bitboard_utils;
 
+#define DBL_PAWNS_PEN -10
+#define TRI_PAWNS_PEN -12
+#define PASS_PAWNS_BONUS 17
+#define ISO_PAWNS_PEN -10
+#define HALF_ISO_PAWNS_PEN -4
+
+#define OPEN_FILE_ROOKS_BONUS 10
+#define HALF_OPEN_FILE_ROOKS_BONUS 5
+
 constexpr array<Score, 5> material = { 100, 320, 330, 500, 900 };
 
 constexpr array<Score, 64> pawn_psqt = {
@@ -87,33 +96,6 @@ constexpr array<array<Score, 64>, 2> king_psqt = {{
         -50,-30,-30,-30,-30,-30,-30,-50
     }
 }};
-
-constexpr Score double_pawns_pen = -10;
-constexpr Score tripled_pawns_pen = -12;
-
-constexpr Score passed_pawn_bonus = 17;
-
-constexpr Score isolated_pawns_pen = -10;
-constexpr Score half_isolated_pawns_pen = -4;
-
-constexpr Score open_file_rooks_bonus = 10;
-constexpr Score half_open_file_rooks_bonus = 5;
-
-inline BB north_fill(BB gen) {
-    gen |= (gen << 8);
-    gen |= (gen << 16);
-    gen |= (gen << 32);
-    return gen;
-}
-
-inline BB south_fill(BB gen) {
-    gen |= (gen >> 8);
-    gen |= (gen >> 16);
-    gen |= (gen >> 32);
-    return gen;
-}
-
-inline BB file_fill(BB gen) { return north_fill(gen) | south_fill(gen); }
 
 inline BB wfront_span(BB wpawns) { return north_fill(wpawns) << 8; }
 inline BB brear_span(BB bpawns) { return north_fill(bpawns) << 8; }
