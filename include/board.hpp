@@ -196,11 +196,14 @@ namespace zobrist {
 #define UNUSED -1
 
 struct SearchParams {
-    int max_depth = 0;
+    int max_depth = UNUSED;
     int nodes = UNUSED;
     int move_time = UNUSED;
-    int inc = UNUSED;
-    int total_time = UNUSED;
+    int wtime = UNUSED;
+    int btime = UNUSED;
+    int winc = UNUSED;
+    int binc = UNUSED;
+    int movestogo = UNUSED;
     bool infinite = false;
 
     SearchParams(const SearchParams&) = default;
@@ -212,12 +215,16 @@ struct SearchParams {
 
 #define CAPTURES true
 #define ALLMOVES false
+#define MAX_PLY 64
+#define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
 
 using Score = int;
 
 class Board {
 private:
     vector<BoardState> prev_states;
+    array<int, MAX_PLY> pv_length = { 0 };
+    void update_pv(int ply, int pv_idx, int next_pv_idx);
     Move generate_move_nopromo(Square from_sq, Square to_sq);
     Score quiescence(Score alpha, Score beta, int ply);
     Score search(int depth, int ply, Score alpha, Score beta, bool is_pv_node, bool null_move_allowed = true);
@@ -234,6 +241,7 @@ private:
 public:
     SearchParams search_params;
     BoardState state;
+    array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
 
     Board() {
         move_generator::init_sliding_move_tables();
@@ -268,6 +276,7 @@ public:
     Score eval();
     void run_search();
     bool is_rep();
+    void clean_search();
 };
 
 #endif

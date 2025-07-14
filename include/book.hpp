@@ -5,8 +5,9 @@
 #include <cstdint>
 #include <array>
 #include <vector>
+#include <filesystem>
 
-#define BOOK_PATH "../openings/book.bin"
+extern std::filesystem::path book_path;
 
 namespace polyglot {
     using PolyKey = uint64_t;

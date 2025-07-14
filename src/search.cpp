@@ -4,9 +4,7 @@
 #include "../include/transposition.hpp"
 #include "../include/book.hpp"
 #include <iostream>
-
-long researches = 0;
-long tt_cuttoffs = 0;
+#include <random>
 
 /// @brief Values for scoring captures. See https://www.chessprogramming.org/MVV-LVA.
 constexpr std::array<std::array<int, 6>, 5> MVV_LVA_table = {{
@@ -17,8 +15,43 @@ constexpr std::array<std::array<int, 6>, 5> MVV_LVA_table = {{
     {{ 55, 54, 53, 52, 51, 50 }}
 }};
 
+void Board::clean_search() {
+    history_moves.fill({{0}});
+    prev_pv_table.fill(nullmove);
+    killer_moves.fill({{nullmove}});
+    pv_table.fill(nullmove);
+    pv_length.fill(0);
+    stop_flag.store(true);
+}
+
+void Board::update_pv(int ply, int pv_idx, int next_pv_idx) {
+    if (pv_length[ply + 1] > 0) {
+        for (int n = 0; n < pv_length[ply + 1]; n++) {
+            if (pv_table[next_pv_idx + n] == nullmove) break;
+            pv_table[pv_idx + n + 1] = pv_table[next_pv_idx + n];
+            pv_length[ply] = pv_length[ply + 1] + 1;
+        }
+
+    } else pv_length[ply] = 1;
+}
+
+bool Board::is_search_stopped() {
+    if (stop_flag.load())
+        return true;
+
+    // Time check
+    if (search_params.move_time > 0) {
+        int elapsed = elapsed_ms(start_time);
+        if (elapsed >= search_params.move_time - 50)
+            // Subtract 50 ms for some calc time.
+            return true;
+    }
+
+    return false;
+}
+
 void Board::order_moves(Move hash_move, int ply) {
-    auto& list = state.move_list;
+    MoveList& list = state.move_list;
     const int pv_index = get_pv_index(ply);
 
     std::vector<std::pair<Move, Score>> scored_moves(list.size());
@@ -74,21 +107,6 @@ void Board::order_moves(Move hash_move, int ply) {
 
     std::transform(scored_moves.begin(), scored_moves.end(), list.begin(),
                [](const auto& pair) { return pair.first; });
-}
-
-bool Board::is_search_stopped() {
-    if (stop_flag.load())
-        return true;
-
-    // Time check
-    if (search_params.move_time > 0) {
-        int elapsed = elapsed_ms(start_time);
-        if (elapsed >= search_params.move_time - 50)
-            // Subtract 50 ms for some calc time.
-            return true;
-    }
-
-    return false;
 }
 
 // See https://www.chessprogramming.org/Quiescence_Search.
@@ -150,10 +168,8 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
         else {
             score = -search(depth - 1, 1, -alpha - 1, -alpha, false);
 
-            if (score > alpha) {
-                researches++;
+            if (score > alpha)
                 score = -search(depth - 1, 1, -beta, -alpha, true);
-            }
         }
 
         unmake_last_move();
@@ -169,7 +185,7 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
                 // Update history heuristic. See https://www.chessprogramming.org/History_Heuristic.
                 Square from = get_from_sq(move);
                 Square to = get_to_sq(move);
-                history_moves[from][to][game_board.state.side_to_move] = depth * depth;
+                history_moves[from][to][state.side_to_move] = depth * depth;
             }
 
             TranspositionEntry new_entry;
@@ -213,8 +229,6 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
 
 Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node, bool null_move_allowed) {
 
-    // Generate and sort moves
-
     // Check extensions
     if (is_side_in_check(state.side_to_move)) depth++;
 
@@ -243,14 +257,10 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
         if (!is_pv_node) {
             if (ent == EXACT ||
             (ent == LOWER && ents >= beta) ||
-            (ent == UPPER && ents < alpha)) {
-                tt_cuttoffs++;
+            (ent == UPPER && ents < alpha))
                 return ents;
-            }
-        } else if (ent == EXACT) {
-            tt_cuttoffs++;
+        } else if (ent == EXACT)
             return ents;
-        }
     }
 
     generate_moves<ALLMOVES>();
@@ -313,17 +323,14 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
         else {
             score = -search(new_depth, ply + 1, -alpha - 1, -alpha, false);
 
-            if (score > alpha) {
-                researches++;
+            if (score > alpha)
                 score = -search(new_depth, ply + 1, -beta, -alpha, true);
-            }
         }
 
         // Research LMR
         if (reduction && score > alpha) {
             new_depth += reduction;
             reduction = 0;
-            researches++;
 
             if (!raised_alpha)
                 score = -search(new_depth, ply + 1, -beta, -alpha, is_pv_node);
@@ -331,10 +338,8 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
             else {
                 score = -search(new_depth, ply + 1, -alpha - 1, -alpha, false);
 
-                if (score > alpha) {
-                    researches++;
+                if (score > alpha)
                     score = -search(new_depth, ply + 1, -beta, -alpha, is_pv_node);
-                }
             }
         }
         
@@ -355,7 +360,7 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
                 // Update history heuristic. See https://www.chessprogramming.org/History_Heuristic.
                 Square from = get_from_sq(move);
                 Square to = get_to_sq(move);
-                history_moves[from][to][game_board.state.side_to_move] = depth * depth;
+                history_moves[from][to][state.side_to_move] = depth * depth;
             }
             
             TranspositionEntry new_entry;
@@ -381,7 +386,7 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
     }
 
     if (state.move_list.is_empty()) {
-        if (state.is_in_check) alpha = -INF + ply;
+        if (state.is_in_check) alpha = -MATE_VALUE + ply;
         else alpha = -eval() / 3;
     }
 
@@ -410,10 +415,19 @@ void Board::run_search() {
     if (!entries.empty()) {
         cout << "info string book move " << endl;
         cout << "bestmove ";
-        print_move(polyglot::get_book_move(entries[0], game_board.state));
+        int limit = std::min(3, (int)entries.size());
+        int idx = rand() % limit;
+        print_move(polyglot::get_book_move(entries[idx], game_board.state));
         cout << endl;
         return;
-    } 
+    }
+
+    if (search_params.move_time == UNUSED && search_params.max_depth == UNUSED && !search_params.infinite) {
+        search_params.move_time = (state.side_to_move == white) ? search_params.wtime : search_params.btime;
+        search_params.move_time /= search_params.movestogo;
+        search_params.max_depth = MAX_DEPTH;
+        cout << "info string searching for " << search_params.move_time << "ms" << endl;
+    }
 
     prev_pv_table = pv_table;
     pv_table.fill(nullmove);
@@ -436,8 +450,6 @@ void Board::run_search() {
     int fail_lows = 0;
     int fail_highs = 0;
     while (1) {
-        researches = 0;
-        tt_cuttoffs = 0;
         nodes = 0;
 
         if (d > 1 && !aw_research) {
@@ -469,14 +481,26 @@ void Board::run_search() {
         fail_highs = 0;
         fail_lows = 0;
         
-        std::cout << "info depth " << d << " nodes " << nodes << " time " << elapsed_ms(depth_search_time) 
-        << " rs " << researches << " ttc " << tt_cuttoffs
-        << " score cp " << score << " pv ";
+        std::cout << "info depth " << d << " nodes " << nodes << " time " << elapsed_ms(depth_search_time); 
+        
+        if (abs(score) < MATE_VALUE - 100)
+            cout << " score cp " << score;
+        else {
+            cout << " score mate ";
+
+            // Mate is printed in moves not plies, hence halving and +/- 1.
+            if (score > 0)
+                cout << (MATE_VALUE - score) / 2 + 1;
+            else
+                cout << -(MATE_VALUE + score) / 2 - 1;
+        }
+
+        cout << " pv ";
         for (int i = 0; i < pv_length[0]; i++) {
             print_move(pv_table[i]);
             std::cout << " ";
         }
-        
+
         std::cout << std::endl;
         
         depth_search_time = std::chrono::steady_clock::now();

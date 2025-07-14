@@ -55,9 +55,9 @@ PolyKey polyglot::gen_poly_key(BoardState& state) {
 }
 
 std::vector<BookEntry> polyglot::probe_book(PolyKey key) {
-    std::ifstream file(BOOK_PATH, std::ios::binary);
+    std::ifstream file(book_path, std::ios::binary);
     if (!file) {
-        std::cerr << "Failed to open book file: " << BOOK_PATH << std::endl;
+        std::cout << "info string Failed to open book file: " << book_path << std::endl;
         return {};
     }
 

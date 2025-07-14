@@ -119,37 +119,66 @@ void clean() {
 }
 
 void handle_go(const string& command) {
-    SearchParams params;
     vector<string> tokens = get_tokens(command);
     bool go_perft = false;
     int perft_depth = 0;
 
-    if (tokens.size() == 1) return;
-
     for (size_t i = 1; i < tokens.size(); ++i) {
         const string& tok = tokens[i];
         if (tok == "depth" && i + 1 < tokens.size())
-            params.max_depth = stoi(tokens[++i]);
+            game_board.search_params.max_depth = stoi(tokens[++i]);
         else if (tok == "movetime" && i + 1 < tokens.size())
-            params.move_time = stoi(tokens[++i]);
+            game_board.search_params.move_time = stoi(tokens[++i]);
+        else if (tok == "movestogo" && i + 1 < tokens.size()) {
+            game_board.search_params.movestogo = stoi(tokens[++i]);
+            game_board.search_params.max_depth = UNUSED;
+            game_board.search_params.move_time = UNUSED;
+            game_board.search_params.nodes = UNUSED;
+            game_board.search_params.infinite = false;
+        }
         else if (tok == "nodes" && i + 1 < tokens.size())
-            params.nodes = stoi(tokens[++i]);
+            game_board.search_params.nodes = stoi(tokens[++i]);
         else if (tok == "infinite")
-            params.infinite = true;
-        else if (tok == "wtime" && i + 1 < tokens.size())
-            params.total_time = stoi(tokens[++i]);
-        else if (tok == "btime" && i + 1 < tokens.size())
-            params.total_time = stoi(tokens[++i]);
-        else if (tok == "winc" && i + 1 < tokens.size())
-            params.inc = stoi(tokens[++i]);
-        else if (tok == "binc" && i + 1 < tokens.size())
-            params.inc = stoi(tokens[++i]);
+            game_board.search_params.infinite = true;
+        else if (tok == "wtime" && i + 1 < tokens.size()) {
+            game_board.search_params.wtime = stoi(tokens[++i]);
+            game_board.search_params.max_depth = UNUSED;
+            game_board.search_params.move_time = UNUSED;
+            game_board.search_params.nodes = UNUSED;
+            game_board.search_params.infinite = false;
+        }
+        else if (tok == "btime" && i + 1 < tokens.size()) {
+            game_board.search_params.btime = stoi(tokens[++i]);
+            game_board.search_params.max_depth = UNUSED;
+            game_board.search_params.move_time = UNUSED;
+            game_board.search_params.nodes = UNUSED;
+            game_board.search_params.infinite = false;
+        }
+        else if (tok == "winc" && i + 1 < tokens.size()) {
+            game_board.search_params.winc = stoi(tokens[++i]);
+            game_board.search_params.max_depth = UNUSED;
+            game_board.search_params.move_time = UNUSED;
+            game_board.search_params.nodes = UNUSED;
+            game_board.search_params.infinite = false;
+        }
+        else if (tok == "binc" && i + 1 < tokens.size()) {
+            game_board.search_params.binc = stoi(tokens[++i]);
+            game_board.search_params.max_depth = UNUSED;
+            game_board.search_params.move_time = UNUSED;
+            game_board.search_params.nodes = UNUSED;
+            game_board.search_params.infinite = false;
+        }
         else if (tok == "perft" && i + 1 < tokens.size()) {
             perft_depth = stoi(tokens[++i]);
             go_perft = true;
         }
     }
 
+    cout << "info string depth " << game_board.search_params.max_depth << " movetime " << game_board.search_params.move_time
+    << " movestogo " << game_board.search_params.movestogo << " infinite " << game_board.search_params.infinite
+    << " wtime " << game_board.search_params.wtime << " winc " << game_board.search_params.winc
+    << " btime " << game_board.search_params.btime << " binc " << game_board.search_params.binc << endl;
+ 
     if (go_perft) {
         tests::test_board = game_board;
         tests::test(perft_depth);
@@ -157,8 +186,7 @@ void handle_go(const string& command) {
     }
 
     stop_flag.store(false);
-    game_board.search_params = params;
-    thread search_thread([params]() { game_board.run_search(); });
+    thread search_thread([]() { game_board.run_search(); });
     search_thread.detach();
 }
 
@@ -181,6 +209,11 @@ bool handle_command(const string& command) {
 
     if (command.starts_with("go"))
         handle_go(command);
+
+    if (command == "ucinewgame") {
+        game_board = Board(1);
+        game_board.clean_search();
+    }
 
     if (command.starts_with("setoption")) {
         vector<string> tokens = get_tokens(command);
@@ -244,13 +277,14 @@ bool handle_command(const string& command) {
 
     if (command == "eval") cout << "info score cp " << ((game_board.state.side_to_move == white) ? game_board.eval() : -game_board.eval()) << endl; // Negate the eval as view from white
 
-    if (command == "usage") cout << "info usage " << game_table->usage() << "%"<< endl;
+    if (command == "usage") cout << "info string tt_usage " << game_table->usage() << "%"<< endl;
 
     if (command == "bookmoves") {
         vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
 
         if (!entries.empty()) {
             for (auto& pos : entries) {
+                cout << "info string ";
                 print_move(polyglot::get_book_move(pos, game_board.state));
                 cout << " weight: " << pos.weight;
                 cout << " learn: " << pos.learn;
