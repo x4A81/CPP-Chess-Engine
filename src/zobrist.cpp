@@ -4,8 +4,8 @@
 #define SEED 34567
 
 void zobrist::init_keys() {
-    std::mt19937_64 gen(KEY(SEED)); 
-    std::uniform_int_distribution<KEY> dist(0, UINT64_MAX);
+    std::mt19937_64 gen(Key(SEED)); 
+    std::uniform_int_distribution<Key> dist(0, UINT64_MAX);
 
     for (auto& key : piece_keys) {
         key = dist(gen);
@@ -22,12 +22,11 @@ void zobrist::init_keys() {
     side_key = dist(gen);
 }
 
-KEY zobrist::gen_pos_key(Board_State& state) {
-    KEY key = KEY(0);
+Key zobrist::gen_pos_key(BoardState& state) {
+    Key key = Key(0);
     for (Square sq = 0; sq < 64; sq++) {
         Piece piece = state.piece_list.at(sq);
-        if (piece > 12)
-            continue;
+        if (piece > bpieces) continue;
         key ^= piece_keys.at(piece * 64 + sq);
     }
 

@@ -38,7 +38,7 @@ void Transposition::clear_tt() {
         std::fill_n(transposition_tt, transposition_size, TranspositionEntry{});
 }
 
-TranspositionEntry* Transposition::probe(KEY key, int depth) {
+TranspositionEntry* Transposition::probe(Key key, int depth) {
     if (!transposition_tt || transposition_size == 0)
         return nullptr;
     

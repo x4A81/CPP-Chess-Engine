@@ -15,7 +15,7 @@ enum EntryType {
 };
 
 struct alignas(64) TranspositionEntry {
-    KEY key;
+    Key key;
     Move hash_move;
     int depth;
     Score score;
@@ -53,7 +53,7 @@ public:
     bool is_initialised = false;
 
     void clear_tt();
-    TranspositionEntry* probe(KEY key, int depth);
+    TranspositionEntry* probe(Key key, int depth);
     void store_entry(TranspositionEntry& entry);
     float usage() const;
 };

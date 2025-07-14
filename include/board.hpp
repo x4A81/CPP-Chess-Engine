@@ -35,6 +35,9 @@ enum SquaresEncoding : Square {
 /// @return The reflected square across the rank axis.
 inline Square flip_rank(Square sq) { return sq ^ 56; }
 
+inline int get_file(Square sq) { return sq & 7; }
+inline int get_rank(Square sq) { return sq >> 3; }
+
 /// @brief Piece representation, also used for indexing.
 using Piece = int;
 enum PiecesEncoding : Piece {
@@ -162,8 +165,8 @@ public:
     }
 };
 
-using KEY = uint64_t;
-struct Board_State {
+using Key = uint64_t;
+struct BoardState {
     array<BB, 15>bitboards{}; // p...kP...K black, white, all
     array<Piece, 64>piece_list{};
     Square enpassant_square;
@@ -171,23 +174,23 @@ struct Board_State {
     uint8_t castling_rights;
     int halfmove_clock;
     int fullmove_counter;
-    KEY hash_key;
+    Key hash_key;
     MoveList move_list;
-    bool is_in_check;
+    bool is_in_check = 0;
     void reset();
 };
 
 class Board;
 
-using KEY = uint64_t;
+using Key = uint64_t;
 namespace zobrist {
-    inline array<KEY, 768> piece_keys; // 12 * 64
-    inline array<KEY, 4> castling_keys;
-    inline array<KEY, 8> ep_file_key;
-    inline KEY side_key;
+    inline array<Key, 768> piece_keys; // 12 * 64
+    inline array<Key, 4> castling_keys;
+    inline array<Key, 8> ep_file_key;
+    inline Key side_key;
 
     void init_keys();
-    KEY gen_pos_key(Board_State& state);
+    Key gen_pos_key(BoardState& state);
 }
 
 #define UNUSED -1
@@ -214,7 +217,7 @@ using Score = int;
 
 class Board {
 private:
-    vector<Board_State> prev_states;
+    vector<BoardState> prev_states;
     Move generate_move_nopromo(Square from_sq, Square to_sq);
     Score quiescence(Score alpha, Score beta, int ply);
     Score search(int depth, int ply, Score alpha, Score beta, bool is_pv_node, bool null_move_allowed = true);
@@ -230,7 +233,7 @@ private:
 
 public:
     SearchParams search_params;
-    Board_State state;
+    BoardState state;
 
     Board() {
         move_generator::init_sliding_move_tables();
@@ -246,12 +249,12 @@ public:
         prev_states.push_back(state);
     }
 
-    Board(int load_start) {
+    Board(bool load_start) {
         if (!load_start) return;
         move_generator::init_sliding_move_tables();
+        zobrist::init_keys();
         load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
         prev_states.push_back(state);
-        zobrist::init_keys();
     }
 
     void load_fen(string fen);

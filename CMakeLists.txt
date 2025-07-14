@@ -36,5 +36,14 @@ target_compile_options(Engine PRIVATE
     $<$<CONFIG:Release>: -O3 -march=native -DNDEBUG>
 )
 
+# Copy book.bin after build
+add_custom_command(TARGET Engine POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+            ${CMAKE_CURRENT_BINARY_DIR}/openings
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_SOURCE_DIR}/openings/book.bin
+            ${CMAKE_CURRENT_BINARY_DIR}/openings/book.bin
+)
+
 # Compile using
 # "path to cmake exec" --build "path to build folder" --config Release

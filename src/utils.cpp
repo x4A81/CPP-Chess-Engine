@@ -59,8 +59,8 @@ void print_piece_list(std::array<Piece, 64> list) {
 }
 
 std::string square_to_string(Square sq) {
-    char file = 'a' + (sq & 7);
-    char rank = '1' + (sq >> 3);
+    char file = 'a' + get_file(sq);
+    char rank = '1' + get_rank(sq);
     return std::string() + file + rank;
 }
 

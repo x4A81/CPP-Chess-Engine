@@ -4,6 +4,7 @@
 #include "../include/search.hpp"
 #include "../include/transposition.hpp"
 #include "../include/tests.hpp"
+#include "../include/book.hpp"
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -31,7 +32,7 @@ Move parse_move_string(const string move_str) {
     Move move = nullmove;
     Code code = 0;
 
-    Board_State state = game_board.state;
+    BoardState state = game_board.state;
 
     int file = move_str[0] - 'a';
     int rank = move_str[1] - '1';
@@ -40,7 +41,6 @@ Move parse_move_string(const string move_str) {
     file = move_str[2] - 'a';
     rank = move_str[3] - '1';
     Square to_sq = rank * 8 + file;
-    move = from_sq | (to_sq << 6);
 
     bool is_pawn = (state.piece_list[from_sq] == P || state.piece_list[from_sq] == p);
     
@@ -50,11 +50,33 @@ Move parse_move_string(const string move_str) {
     if (state.piece_list[from_sq] == K && from_sq == e1) {
         if (to_sq == g1) code = kcastle;
         if (to_sq == c1) code = qcastle;
+
+        // Some UCI engines use e1h1 for short castling.
+        // This is wrong but supported here anyway.
+        if (to_sq == h1) {
+            code = kcastle;
+            to_sq = g1;
+        }
+
+        if (to_sq == a1) {
+            code = qcastle;
+            to_sq = c1;
+        }
     }
 
     if (state.piece_list[from_sq] == k && from_sq == e8) {
         if (to_sq == g8) code = kcastle;
         if (to_sq == c8) code = qcastle;
+
+        if (to_sq == h8) {
+            code = kcastle;
+            to_sq = g8;
+        }
+
+        if (to_sq == a8) {
+            code = qcastle;
+            to_sq = c8;
+        }
     }
 
     if (state.piece_list[to_sq] != no_piece)
@@ -75,6 +97,7 @@ Move parse_move_string(const string move_str) {
         }
     }
 
+    move = from_sq | (to_sq << 6);
     return move | (code << 12);
 }
 
@@ -222,6 +245,20 @@ bool handle_command(const string& command) {
     if (command == "eval") cout << "info score cp " << ((game_board.state.side_to_move == white) ? game_board.eval() : -game_board.eval()) << endl; // Negate the eval as view from white
 
     if (command == "usage") cout << "info usage " << game_table->usage() << "%"<< endl;
+
+    if (command == "bookmoves") {
+        vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
+
+        if (!entries.empty()) {
+            for (auto& pos : entries) {
+                print_move(polyglot::get_book_move(pos, game_board.state));
+                cout << " weight: " << pos.weight;
+                cout << " learn: " << pos.learn;
+                cout << endl;
+            }
+        } else 
+            cout << "NO ENTRIES";
+    }
 
     return false;
 }

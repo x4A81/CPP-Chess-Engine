@@ -2,6 +2,7 @@
 #include "../include/board.hpp"
 #include "../include/utils.hpp"
 #include "../include/transposition.hpp"
+#include "../include/book.hpp"
 #include <iostream>
 
 long researches = 0;
@@ -82,7 +83,8 @@ bool Board::is_search_stopped() {
     // Time check
     if (search_params.move_time > 0) {
         int elapsed = elapsed_ms(start_time);
-        if (elapsed >= search_params.move_time)
+        if (elapsed >= search_params.move_time - 50)
+            // Subtract 50 ms for some calc time.
             return true;
     }
 
@@ -120,10 +122,10 @@ Score Board::quiescence(Score alpha, Score beta, int ply) {
         unmake_last_move();
 
         if (score >= beta) return score;
-        if (is_search_stopped()) break;
-
+        
         if (score > best_val) best_val = score;
         if (score > alpha) alpha = score;
+        if (is_search_stopped()) break;
     }
 
     return best_val;
@@ -187,6 +189,8 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
             alpha = score;
             ent = EXACT;
         }
+
+        if (is_search_stopped()) return alpha;
     }
 
     if (alpha <= old_alpha)
@@ -339,8 +343,6 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
 
         unmake_last_move();
 
-        if (is_search_stopped()) break;
-
         if (score >= beta) {
             if (!is_move_capture(move)) {
                 // Update killer heuristics. See https://www.chessprogramming.org/Killer_Heuristic.
@@ -374,6 +376,8 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
             tt_type = EXACT;
             alpha = score;
         }
+
+        if (is_search_stopped()) break;
     }
 
     if (state.move_list.is_empty()) {
@@ -400,6 +404,17 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
 }
 
 void Board::run_search() {
+    // First try the opening book
+    vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
+
+    if (!entries.empty()) {
+        cout << "info string book move " << endl;
+        cout << "bestmove ";
+        print_move(polyglot::get_book_move(entries[0], game_board.state));
+        cout << endl;
+        return;
+    } 
+
     prev_pv_table = pv_table;
     pv_table.fill(nullmove);
     pv_length.fill(0);

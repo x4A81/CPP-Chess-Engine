@@ -1,6 +1,7 @@
 #include "../include/board.hpp"
 #include "../include/utils.hpp"
 #include "../include/misc.hpp"
+#include "../include/book.hpp"
 #include <iostream>
 #include <sstream>
 
@@ -9,7 +10,7 @@ using namespace move_generator;
 using namespace std;
 
 // Clears board flags and bitboards, then resets flags to defaults
-void Board_State::reset() {
+void BoardState::reset() {
     fill(begin(bitboards), end(bitboards), 0ULL);
     fill(begin(piece_list), end(piece_list), no_piece);
     enpassant_square = no_square;
@@ -87,7 +88,6 @@ void Board::print_board() {
                 piece = piece_to_char(state.piece_list[8*r+f]); // Set the piece to be printed
 
             cout << "| " << piece << " ";
-
         }
 
         cout << "| " << r+1 << endl;
@@ -97,12 +97,18 @@ void Board::print_board() {
 
     cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
     cout << "Side to move: " << ((state.side_to_move == white) ? "White" : "Black") << endl;
-    cout << "Castling rights: " << state.castling_rights << endl;
+    cout << "Castling rights: "
+    << ((state.castling_rights & wking_side) ? "K" : "-")
+    << ((state.castling_rights & wqueen_side) ? "Q" : "-")
+    << ((state.castling_rights & bking_side) ? "k" : "-")
+    << ((state.castling_rights & bqueen_side) ? "q" : "-") << endl;
+    
     cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : square_to_string(state.enpassant_square)) << endl;
     cout << "Halfmove clock: " << state.halfmove_clock << endl;
     cout << "Fullmove counter: " << state.fullmove_counter << endl;
     cout << "Hash Key: " << state.hash_key << endl;
-    cout << "Checked: " << state.is_in_check << endl;
+    cout << "Poly Key: " << polyglot::gen_poly_key(state) << endl;
+    cout << "Checked: " << is_side_in_check(state.side_to_move) << endl;
 }
 
 Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
@@ -130,7 +136,6 @@ Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
         code = epcapture;
 
     return move | (code << 12);
-    
 }
 
 bool Board::is_side_in_check(Colour side) {
@@ -533,7 +538,7 @@ template void Board::generate_moves<ALLMOVES>();
 
 void Board::make_move(Move move) {
     prev_states.push_back(state);
-    KEY& key = state.hash_key;
+    Key& key = state.hash_key;
 
     if (move == nullmove) {
         if (state.side_to_move == black) state.fullmove_counter++;
@@ -695,7 +700,7 @@ bool Board::is_rep() {
     if (state.halfmove_clock >= 50) return true;
 
     int repetition_count = 1; // include current state
-    KEY current_key = state.hash_key;
+    Key current_key = state.hash_key;
     for (const auto& prev : prev_states) {
         if (prev.hash_key == current_key)
             repetition_count++;
