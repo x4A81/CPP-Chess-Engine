@@ -80,12 +80,12 @@ void Board::load_fen(string fen) {
 
 void Board::print_board() {
     
-    for (int r = 7; r >= 0; r--) { // Loop over the ranks
+    for (int r = 7; r >= 0; r--) {
         cout << "+---+---+---+---+---+---+---+---+" << endl;
-        for (int f = 0; f < 8; f++) { // Loop over the files
-            char piece = ' '; // What piece to print, is empty
-            if (state.piece_list[8*r+f] != no_piece) // If there is a piece on this square
-                piece = piece_to_char(state.piece_list[8*r+f]); // Set the piece to be printed
+        for (int f = 0; f < 8; f++) {
+            char piece = ' ';
+            if (state.piece_list[8*r+f] != no_piece)
+                piece = piece_to_char(state.piece_list[8*r+f]); 
 
             cout << "| " << piece << " ";
         }
@@ -93,7 +93,7 @@ void Board::print_board() {
         cout << "| " << r+1 << endl;
     }
 
-    // Print the board state flags
+    // Print the board state vars
 
     cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
     cout << "Side to move: " << ((state.side_to_move == white) ? "White" : "Black") << endl;
@@ -111,20 +111,22 @@ void Board::print_board() {
     cout << "Checked: " << is_side_in_check(state.side_to_move) << endl;
 }
 
+[[gnu::hot]]
 Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
     Move move = from_sq | (to_sq << 6);
     Code code = 0;
-    bool is_pawn = (state.piece_list[from_sq] == P || state.piece_list[from_sq] == p);
+    Piece piece = state.piece_list[from_sq];
+    bool is_pawn = (piece == P || piece == p);
     
     if (is_pawn && (to_sq - from_sq == 16 || to_sq - from_sq == -16))
         code = dbpush;
 
-    if (state.piece_list[from_sq] == K && from_sq == e1) {
+    if (piece == K && from_sq == e1) {
         if (to_sq == g1) code = kcastle;
         if (to_sq == c1) code = qcastle;
     }
 
-    if (state.piece_list[from_sq] == k && from_sq == e8) {
+    if (piece == k && from_sq == e8) {
         if (to_sq == g8) code = kcastle;
         if (to_sq == c8) code = qcastle;
     }
@@ -197,6 +199,7 @@ bool Board::is_side_in_check(Colour side) {
 }
 
 template <bool GEN_CAPTURES>
+[[gnu::hot]]
 void Board::generate_moves() {
 
     // Handle the movement mask
@@ -536,6 +539,7 @@ void Board::generate_moves() {
 template void Board::generate_moves<CAPTURES>();
 template void Board::generate_moves<ALLMOVES>();
 
+[[gnu::hot]]
 void Board::make_move(Move move) {
     prev_states.push_back(state);
     Key& key = state.hash_key;
@@ -689,6 +693,7 @@ void Board::make_move(Move move) {
     state.bitboards[14] = state.bitboards[12] | state.bitboards[13];
 }
 
+[[gnu::hot]]
 void Board::unmake_last_move() {
     if (prev_states.size() > 1) {
         state = prev_states.back();

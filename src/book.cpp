@@ -90,10 +90,8 @@ Move polyglot::get_book_move(BookEntry& entry, BoardState& state) {
     bool is_pawn = (moved == P || moved == p);
     bool is_white = moved < bpieces;
 
-    // Detect promotion rank
     bool is_promotion_rank = (to >= 0 && to <= 7) || (to >= 56 && to <= 63);
 
-    // Handle promotions (polyglot encodes them as promo piece in bits 12–14)
     if (promo && is_pawn && is_promotion_rank) {
         switch (promo) {
             case 1: code = is_white
@@ -116,25 +114,20 @@ Move polyglot::get_book_move(BookEntry& entry, BoardState& state) {
         }
     }
 
-    // Castling (note: no need to check castling rights — book assumes legal move)
     else if (moved == K && from == e1 && to == g1) code = kcastle;
     else if (moved == K && from == e1 && to == c1) code = qcastle;
     else if (moved == k && from == e8 && to == g8) code = kcastle;
     else if (moved == k && from == e8 && to == c8) code = qcastle;
 
-    // En passant (square is empty, but pawn moves to enpassant square)
     else if (is_pawn && to == state.enpassant_square && captured == no_piece)
         code = epcapture;
 
-    // Double pawn push
     else if (is_pawn && std::abs(to - from) == 16 && captured == no_piece)
         code = dbpush;
 
-    // Capture
     else if (captured != no_piece)
         code = capture;
 
-    // Quiet
     else
         code = quiet;
 

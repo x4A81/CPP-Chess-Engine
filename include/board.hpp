@@ -145,6 +145,7 @@ private:
     size_t _size;
 
 public:
+    [[gnu::hot]]
     void add(Move move) { _moves.at(_size++) = move; }
 
     void clear() {
@@ -269,9 +270,12 @@ public:
     void print_board();
 
     template <bool GEN_CAPTURES>
+    [[gnu::hot]]
     void generate_moves();
     bool is_side_in_check(Colour side);
+    [[gnu::hot]]
     void make_move(Move move);
+    [[gnu::hot]]
     void unmake_last_move();
     Score eval();
     void run_search();

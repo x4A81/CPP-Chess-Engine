@@ -102,43 +102,45 @@ namespace bitboard_utils {
     /// @brief Square masking helper.
     /// @param sq Square to mask.
     /// @return Bitboard of masked square.
+    [[gnu::always_inline, gnu::hot]]
     inline constexpr BB mask(Square sq) { 
         assert(sq >= 0 && sq < 64); return BB(1) << sq; }
 
     /// @brief Bit popper helper.
     /// @param bb Reference to bitboard.
     /// @param sq Square index in bitboard to pop.
+    [[gnu::always_inline, gnu::hot]]
     inline void pop_bit(BB& bb, Square sq) { bb &= ~mask(sq); }
 
     /// @brief Bit setter helper.
     /// @param bb Reference to bitboard.
     /// @param sq Square index in bitboard to pop.
+    [[gnu::always_inline, gnu::hot]]
     inline void set_bit(BB& bb, Square sq) { bb |= mask(sq); }
 
     /// @brief Bit getter helper.
     /// @param bb Reference to bitboard.
     /// @param sq Square index in bitboard to get.
     /// @return 1 if bit is set, 0 if not set.
+    [[gnu::always_inline, gnu::hot]]
     inline int get_bit(BB bb, Square sq) { return (bb >> sq) & 1; }
 
     /// @brief Population counter helper.
     /// @param bb Bitboard to count.
     /// @return The number of set bits in bb.
+    [[gnu::always_inline, gnu::hot]]
     inline int pop_count(BB bb) { return popcount(bb); }
     
     /// @brief Bit scanner helper.
     /// @param bb Bitboard to scan.
     /// @return The index of the least significant set bit in bb.
+    [[gnu::always_inline, gnu::hot]]
     inline int bitscan_forward(BB bb) { assert(bb != 0); return countr_zero(bb); }
-    
-    /// @brief Bit scanner helper.
-    /// @param bb Bitboard to scan.
-    /// @return The index of the most significant set bit in bb.
-    inline int bitscan_reverse(BB bb) { assert(bb != 0); return 63 - countl_zero(bb); }
 
     /// @brief Bit popper helper. Pops the least significant set bit and returns its index.
     /// @param bb Reference to bitboard.
     /// @return The index of the least significant set bit.
+    [[gnu::always_inline, gnu::hot]]
     inline int pop_lsb(BB& bb) {
         assert(bb != 0);
         int sq = countr_zero(bb);
@@ -150,6 +152,7 @@ namespace bitboard_utils {
     /// @param bb Bitboard to shift.
     /// @param dir Direction to shift.
     /// @return The shifted bitboard.
+    [[gnu::always_inline, gnu::hot]]
     inline BB shift_one(BB bb, Dir dir) {
         int s = shifts[dir];
         return rotl(bb, s) & avoid_wraps[dir];
@@ -160,6 +163,7 @@ namespace bitboard_utils {
     /// @param occ Bitboard of blockers.
     /// @param dir Direction to fill.
     /// @return Filled bitboard.
+    [[gnu::always_inline, gnu::hot]]
     inline BB occ_fill(BB bb, BB occ, Dir dir) {
         int s = shifts[dir];
         occ &= avoid_wraps[dir];
@@ -176,6 +180,7 @@ namespace bitboard_utils {
     /// @param occ Bitboard of blockers.
     /// @param dir Direction of moves.
     /// @return Bitboard of sliding attacks.
+    [[gnu::always_inline, gnu::hot]]
     inline BB sliding_attacks(BB sliders, BB occ, Dir dir) {
         return shift_one(occ_fill(sliders, ~occ, dir), dir);
     }
@@ -183,6 +188,7 @@ namespace bitboard_utils {
     /// @brief Fill helper.
     /// @param sq Square to fill on.
     /// @return Bitboard of horizontal fill.
+    [[gnu::always_inline, gnu::hot]]
     inline constexpr BB hor_fill(Square sq) {
         return precomp_hor_fill[sq];
     }
@@ -190,6 +196,7 @@ namespace bitboard_utils {
     /// @brief Fill helper.
     /// @param sq Square to fill on.
     /// @return Bitboard of vertical fill.
+    [[gnu::always_inline, gnu::hot]]
     inline BB ver_fill(Square sq) {
         return precomp_ver_fill[sq];
     }
@@ -197,6 +204,7 @@ namespace bitboard_utils {
     /// @brief Fill helper.
     /// @param sq Square to fill on.
     /// @return Bitboard of diagonal fill.
+    [[gnu::always_inline, gnu::hot]]
     inline BB dia_fill(Square sq) {
         return precomp_dia_fill[sq];
     }
@@ -204,6 +212,7 @@ namespace bitboard_utils {
     /// @brief Fill helper.
     /// @param sq Square to fill on.
     /// @return Bitboard of anti-diagonal fill.
+    [[gnu::always_inline, gnu::hot]]
     inline BB antdia_fill(Square sq) {
         return precomp_antdia_fill[sq];
     }
