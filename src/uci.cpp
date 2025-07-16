@@ -297,14 +297,13 @@ bool handle_command(const std::string& command) {
 
         if (!entries.empty()) {
             for (auto& pos : entries) {
-                std::print("info string ");
-                print_move(polyglot::get_book_move(pos, game_board.state));
+                std::print("info string {}", move_to_string(polyglot::get_book_move(pos, game_board.state)));
                 std::println(" weight: {} learn: {}", pos.weight, pos.learn);
             }
         } else {
             std::println("info string no book entries");
         }
     }
-    
+
     return false;
 }

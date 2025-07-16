@@ -43,7 +43,7 @@ namespace tests {
             long c_positions = positions_searched;
             perft(depth - 1);
             if (divide) {
-                print_move(move);
+                std::print("{}", move_to_string(move));
                 std::print(": {}\n", positions_searched - c_positions);
             }
 

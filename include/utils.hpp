@@ -24,9 +24,9 @@ char piece_to_char(Piece piece);
 /// @return the value of the piece
 Piece char_to_piece(char c);
 
-/// @brief Prints an encoded move in 'Pure coordinate notation'
-/// @param move the encoded move to print
-void print_move(Move move);
+/// @brief Returns an encoded move in 'Pure coordinate notation'
+/// @param move the encoded move in a string
+std::string move_to_string(const Move move);
 
 /// @brief Converts a square value in the Squares enum into pure coordinate notation
 /// @param sq 

@@ -1,4 +1,4 @@
-#include <iostream>
+#include <print>
 
 #include "../include/utils.hpp"
 #include "../include/bitboard_math.hpp"
@@ -28,36 +28,35 @@ Piece char_to_piece(char c) {
 }
 
 void print_bitboard(BB bb) {
-    std::cout << "Bitboard val: " << bb << "\n";
+    std::print("Bitboard val: {}\n", bb);
     for (int r = 7; r >= 0; --r) {
-        std::cout << " " << r+1 << " |";
+        std::print(" {} |", r+1);
         for (int f = 0; f < 8; ++f) {
             int sq = 8*r+f;
-            std::cout << " " << (bb_math::get_bit(bb, sq) ? 1 : 0) << " ";
+            std::print(" {} ", (bb_math::get_bit(bb, sq) ? 1 : 0));
         }
     
-        std::cout << "\n";
+        std::print("\n");
     }
   
-    std::cout << "     a  b  c  d  e  f  g  h\n";
+    std::println("     a  b  c  d  e  f  g  h");
 }
 
 void print_piece_list(std::array<Piece, 64> list) {
-    for (int r = 7; r >= 0; --r) { // Loop over the ranks
-        std::cout << "+---+---+---+---+---+---+---+---+\n";
-        for (int f = 0; f < 8; ++f) { // Loop over the files
-            char piece = ' '; // What piece to print, is empty
-            if (list[8*r+f] != no_piece) // If there is a piece on this square
-                piece = piece_to_char(list[8*r+f]); // Set the piece to be printed
+    for (int r = 7; r >= 0; --r) {
+        std::println("+---+---+---+---+---+---+---+---+");
+        for (int f = 0; f < 8; ++f) {
+            char piece = ' ';
+            if (list[8 * r + f] != no_piece)
+                piece = piece_to_char(list[8 * r + f]);
 
-            std::cout << "| " << piece << " ";
-
+            std::print("| {} ", piece);
         }
 
-        std::cout << "| " << r+1 << "\n";
+        std::println("| {}", r + 1);
     }
 
-    std::cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << std::endl;
+    std::println("+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h");
 }
 
 std::string square_to_string(Square sq) {
@@ -66,19 +65,23 @@ std::string square_to_string(Square sq) {
     return std::string() + file + rank;
 }
 
-void print_move(Move move) {
+std::string move_to_string(const Move move) {
     Square from_sq = get_from_sq(move);
     Square to_sq = get_to_sq(move);
     Code code = get_code(move);
-    std::cout << square_to_string(from_sq) << square_to_string(to_sq);
+
+    std::string result = square_to_string(from_sq) + square_to_string(to_sq);
+
     switch (code) {
         case npromo:
-        case c_npromo: std::cout << 'n'; break;
+        case c_npromo: result += 'n'; break;
         case bpromo:
-        case c_bpromo: std::cout << 'b'; break;
+        case c_bpromo: result += 'b'; break;
         case rpromo:
-        case c_rpromo: std::cout << 'r'; break;
+        case c_rpromo: result += 'r'; break;
         case qpromo:
-        case c_qpromo: std::cout << 'q'; break;
+        case c_qpromo: result += 'q'; break;
     }
+
+    return result;
 }

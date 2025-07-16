@@ -1,5 +1,6 @@
 #include <print>
 #include <random>
+#include <cstdio>
 
 #include "../include/search.hpp"
 #include "../include/board.hpp"
@@ -409,16 +410,36 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
     return alpha;
 }
 
+int choose_weighted_book_move(const std::vector<polyglot::BookEntry>& entries) {
+    int total_weight = 0;
+    for (const auto& entry : entries) {
+        total_weight += entry.weight;
+    }
+
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(1, total_weight);
+
+    int r = dis(gen);
+    for (int i = 0; i < (int)entries.size(); ++i) {
+        r -= entries[i].weight;
+        if (r <= 0) {
+            return i;
+        }
+    }
+
+    return 0;
+}
+
 void Board::run_search() {
     // First try the opening book
     std::vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
 
     if (!entries.empty()) {
-        std::print("info string book move\nbestmove ");
-        int limit = std::min(3, (int)entries.size());
-        int idx = rand() % limit;
-        print_move(polyglot::get_book_move(entries[idx], game_board.state));
-        std::println();
+        int idx = choose_weighted_book_move(entries);
+        polyglot::BookEntry chosen = entries[idx];
+        std::println("info string book move\nbestmove {}", move_to_string(polyglot::get_book_move(chosen, game_board.state)));
+        std::fflush(stdout);
         return;
     }
 
@@ -427,6 +448,7 @@ void Board::run_search() {
         search_params.move_time /= search_params.movestogo;
         search_params.max_depth = MAX_DEPTH;
         std::println("info string searching for {}ms", search_params.move_time);
+        std::fflush(stdout);
     }
 
     prev_pv_table = pv_table;
@@ -490,12 +512,11 @@ void Board::run_search() {
         }
 
         std::print(" pv ");
-        for (int i = 0; i < pv_length[0]; ++i) {
-            print_move(pv_table[i]);
-            std::print(" ");
-        }
+        for (int i = 0; i < pv_length[0]; ++i)
+            std::print("{} ", move_to_string(pv_table[i]));
 
         std::println();
+        std::fflush(stdout);
         
         depth_search_time = std::chrono::steady_clock::now();
         d++;
@@ -506,7 +527,6 @@ void Board::run_search() {
     }
 
     stop_flag.store(true);
-    std::print("bestmove ");
-    print_move(prev_pv_table[0]);
-    std::println();
+    std::println("bestmove {}", move_to_string(prev_pv_table[0]));
+    std::fflush(stdout);
 }
