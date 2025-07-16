@@ -1,12 +1,13 @@
 #ifndef TRANSPOSITION_HPP_INCLUDE
 #define TRANSPOSITION_HPP_INCLUDE
 
-#include "board.hpp"
 #include <cstddef>
 #include <optional>
 
+#include "board.hpp"
+
 class Transposition;
-extern optional<Transposition> game_table;
+extern std::optional<Transposition> game_table;
 
 enum EntryType {
     EXACT,
@@ -21,8 +22,6 @@ struct alignas(64) TranspositionEntry {
     Score score;
     EntryType type;
 };
-
-using namespace std;
 
 constexpr size_t MIN_TT_SIZE_MB = 64;
 constexpr size_t MAX_TT_SIZE_MB = 512;

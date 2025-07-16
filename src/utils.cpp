@@ -1,6 +1,8 @@
-#include "../include/utils.hpp"
-#include "../include/misc.hpp"
 #include <iostream>
+
+#include "../include/utils.hpp"
+#include "../include/bitboard_math.hpp"
+#include "../include/board.hpp"
 
 char piece_to_char(Piece piece) {
     std::string piece_chars = "pnbrqkPNBRQK";
@@ -26,36 +28,36 @@ Piece char_to_piece(char c) {
 }
 
 void print_bitboard(BB bb) {
-    printf("\nBitboard val: 0x%lX\n", bb);
-    for (int r = 7; r >= 0 ; r--) {
+    std::cout << "Bitboard val: " << bb << "\n";
+    for (int r = 7; r >= 0; --r) {
         std::cout << " " << r+1 << " |";
-        for (int f = 0; f < 8; f++) {
+        for (int f = 0; f < 8; ++f) {
             int sq = 8*r+f;
-            std::cout << " " << (bitboard_utils::get_bit(bb, sq) ? 1 : 0) << " ";
+            std::cout << " " << (bb_math::get_bit(bb, sq) ? 1 : 0) << " ";
         }
     
-        std::cout << std::endl;
+        std::cout << "\n";
     }
   
-    std::cout << "     a  b  c  d  e  f  g  h" << std::endl;
+    std::cout << "     a  b  c  d  e  f  g  h\n";
 }
 
 void print_piece_list(std::array<Piece, 64> list) {
-    for (int r = 7; r >= 0; r--) { // Loop over the ranks
-        cout << "+---+---+---+---+---+---+---+---+" << endl;
-        for (int f = 0; f < 8; f++) { // Loop over the files
+    for (int r = 7; r >= 0; --r) { // Loop over the ranks
+        std::cout << "+---+---+---+---+---+---+---+---+\n";
+        for (int f = 0; f < 8; ++f) { // Loop over the files
             char piece = ' '; // What piece to print, is empty
             if (list[8*r+f] != no_piece) // If there is a piece on this square
                 piece = piece_to_char(list[8*r+f]); // Set the piece to be printed
 
-            cout << "| " << piece << " ";
+            std::cout << "| " << piece << " ";
 
         }
 
-        cout << "| " << r+1 << endl;
+        std::cout << "| " << r+1 << "\n";
     }
 
-    cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
+    std::cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << std::endl;
 }
 
 std::string square_to_string(Square sq) {

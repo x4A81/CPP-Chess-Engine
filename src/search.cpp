@@ -1,10 +1,11 @@
+#include <print>
+#include <random>
+
 #include "../include/search.hpp"
 #include "../include/board.hpp"
 #include "../include/utils.hpp"
 #include "../include/transposition.hpp"
 #include "../include/book.hpp"
-#include <iostream>
-#include <random>
 
 /// @brief Values for scoring captures. See https://www.chessprogramming.org/MVV-LVA.
 constexpr std::array<std::array<int, 6>, 5> MVV_LVA_table = {{
@@ -26,7 +27,7 @@ void Board::clean_search() {
 
 void Board::update_pv(int ply, int pv_idx, int next_pv_idx) {
     if (pv_length[ply + 1] > 0) {
-        for (int n = 0; n < pv_length[ply + 1]; n++) {
+        for (int n = 0; n < pv_length[ply + 1]; ++n) {
             if (pv_table[next_pv_idx + n] == nullmove) break;
             pv_table[pv_idx + n + 1] = pv_table[next_pv_idx + n];
             pv_length[ply] = pv_length[ply + 1] + 1;
@@ -410,15 +411,14 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
 
 void Board::run_search() {
     // First try the opening book
-    vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
+    std::vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
 
     if (!entries.empty()) {
-        cout << "info string book move " << endl;
-        cout << "bestmove ";
+        std::print("info string book move\nbestmove ");
         int limit = std::min(3, (int)entries.size());
         int idx = rand() % limit;
         print_move(polyglot::get_book_move(entries[idx], game_board.state));
-        cout << endl;
+        std::println();
         return;
     }
 
@@ -426,7 +426,7 @@ void Board::run_search() {
         search_params.move_time = (state.side_to_move == white) ? search_params.wtime : search_params.btime;
         search_params.move_time /= search_params.movestogo;
         search_params.max_depth = MAX_DEPTH;
-        cout << "info string searching for " << search_params.move_time << "ms" << endl;
+        std::println("info string searching for {}ms", search_params.move_time);
     }
 
     prev_pv_table = pv_table;
@@ -439,10 +439,8 @@ void Board::run_search() {
     // Aspiration windows vars. See https://www.chessprogramming.org/Aspiration_Windows.
 
     // Decay history heuristic.
-    for (int side = 0; side < 2; side++)
-        for (int from = 0; from < 64; from++)
-            for (int to = 0; to < 64; to++)
-                history_moves[from][to][side] /= 2;
+    for (int* p = &history_moves[0][0][0]; p != &history_moves[0][0][0] + 64*64*2; ++p)
+        *p /= 2;
 
     std::chrono::steady_clock::time_point depth_search_time = std::chrono::steady_clock::now();
     Score score;
@@ -481,27 +479,23 @@ void Board::run_search() {
         fail_highs = 0;
         fail_lows = 0;
         
-        std::cout << "info depth " << d << " nodes " << nodes << " time " << elapsed_ms(depth_search_time); 
+        std::print("info depth {} nodes {} time {}", d, nodes, elapsed_ms(depth_search_time)); 
         
         if (abs(score) < MATE_VALUE - 100)
-            cout << " score cp " << score;
+            std::print(" score cp {}", score);
         else {
-            cout << " score mate ";
-
             // Mate is printed in moves not plies, hence halving and +/- 1.
-            if (score > 0)
-                cout << (MATE_VALUE - score) / 2 + 1;
-            else
-                cout << -(MATE_VALUE + score) / 2 - 1;
+            int moves_to_mate = (score > 0) ? (MATE_VALUE - score) / 2 + 1 : -(MATE_VALUE + score) / 2 - 1;
+            std::print(" score mate {}", moves_to_mate);
         }
 
-        cout << " pv ";
-        for (int i = 0; i < pv_length[0]; i++) {
+        std::print(" pv ");
+        for (int i = 0; i < pv_length[0]; ++i) {
             print_move(pv_table[i]);
-            std::cout << " ";
+            std::print(" ");
         }
 
-        std::cout << std::endl;
+        std::println();
         
         depth_search_time = std::chrono::steady_clock::now();
         d++;
@@ -511,8 +505,8 @@ void Board::run_search() {
         pv_length.fill(0);
     }
 
-    std::cout << "bestmove ";
-    print_move(prev_pv_table[0]);
-    std::cout << std::endl;
     stop_flag.store(true);
+    std::print("bestmove ");
+    print_move(prev_pv_table[0]);
+    std::println();
 }

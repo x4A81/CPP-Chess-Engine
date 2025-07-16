@@ -1,9 +1,10 @@
 #ifndef UTILS_HPP_INCLUDE
 #define UTILS_HPP_INCLUDE
 
-#include "board.hpp"
 #include <cstring>
 #include <cstdint>
+
+#include "globals.hpp"
 
 /// @brief Prints a bitboard in a chess-board format
 /// @param bb the bitboard to print

@@ -1,62 +1,16 @@
 #ifndef BOARD_HPP_INCLUDE
 #define BOARD_HPP_INCLUDE
 
-#include "misc.hpp"
 #include <cstdint>
 #include <string>
 #include <array>
 #include <vector>
 
-using namespace std;
+#include "move_gen.hpp"
+#include "globals.hpp"
 
 class Board;
 extern Board game_board;
-
-/// @brief Bitboard type
-using BB = uint64_t;
-
-// @brief encoded squares in 'Little-Endian Rank-File Mapping' format.
-// See https://www.chessprogramming.org/Square_Mapping_Considerations#Little-Endian_File-Rank_Mapping
-
-using Square = int;
-enum SquaresEncoding : Square {
-    a1, b1, c1, d1, e1, f1, g1, h1,
-    a2, b2, c2, d2, e2, f2, g2, h2,
-    a3, b3, c3, d3, e3, f3, g3, h3,
-    a4, b4, c4, d4, e4, f4, g4, h4,
-    a5, b5, c5, d5, e5, f5, g5, h5,
-    a6, b6, c6, d6, e6, f6, g6, h6,
-    a7, b7, c7, d7, e7, f7, g7, h7,
-    a8, b8, c8, d8, e8, f8, g8, h8, no_square
-};
-
-/// @brief Square helper.
-/// @param sq The square to flip.
-/// @return The reflected square across the rank axis.
-inline Square flip_rank(Square sq) { return sq ^ 56; }
-
-inline int get_file(Square sq) { return sq & 7; }
-inline int get_rank(Square sq) { return sq >> 3; }
-
-/// @brief Piece representation, also used for indexing.
-using Piece = int;
-enum PiecesEncoding : Piece {
-    p, n, b, r, q, k, P, N, B, R, Q, K, bpieces = 12, wpieces, allpieces, no_piece
-};
-
-/// @brief Colour representation, also used for indexing.
-using Colour = int;
-enum ColoursEncoding : Colour {
-    black = 0, white = 1, no_colour = 2
-};
-
-/// @brief Colour helper.
-/// @param friendly_colour Colour to get the opposite of.
-/// @return The opposite colour to friendly_colour, no_colour if friendly_colour is no_colour.
-inline Colour opposition_colour(Colour friendly_colour) {
-    if (friendly_colour == no_colour) return no_colour;
-    return friendly_colour ^ 1;
-}
 
 /// @brief Castling rights encoder.
 using CastlingRights = int;
@@ -68,7 +22,7 @@ enum CastlingRightsEncoder : CastlingRights {
 };
 
 /// @brief Castling rights helper.
-inline constexpr array<int, 64> castle_encoder = {
+inline constexpr std::array<int, 64> castle_encoder = {
     13, 15, 15, 15, 12, 15, 15, 14,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
@@ -77,36 +31,6 @@ inline constexpr array<int, 64> castle_encoder = {
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
     7, 15, 15, 15,  3, 15, 15, 11
-};
-
-/// Move encoding:
-/// 6 bits for the from square
-/// 6 bits for the to square
-// 4 bits for a code
-// code  | Promo | capt | special 1 | sp 2 | type
-/// 0    | 0     | 0    | 0         | 0    | quiet
-/// 1    | 0     | 0    | 0         | 1    | dbp pawn
-/// 2    | 0     | 0    | 1         | 0    | king castle
-/// 3    | 0     | 0    | 1         | 1    | q castle
-/// 4    | 0     | 1    | 0         | 0    | capture
-/// 5    | 0     | 1    | 0         | 1    | ep capture
-/// 8    | 1     | 0    | 0         | 0    | knight promo
-/// 9    | 1     | 0    | 0         | 1    | bishop promo
-/// 10   | 1     | 0    | 1         | 0    | rook promo
-/// 11   | 1     | 0    | 1         | 1    | queen promo
-/// 12   | 1     | 1    | 0         | 0    | knight promo capt
-/// 13   | 1     | 1    | 0         | 1    | bishop promo capt
-/// 14   | 1     | 1    | 1         | 0    | rook promo capt
-/// 15   | 1     | 1    | 1         | 1    | queen promo capt
-
-using Move = uint16_t;
-#define nullmove 0
-
-using Code = int;
-
-enum MoveCode : Code {
-    quiet, dbpush, kcastle, qcastle, capture, epcapture, 
-    npromo = 8, bpromo, rpromo, qpromo, c_npromo, c_bpromo, c_rpromo, c_qpromo
 };
 
 /// @brief Move helper.
@@ -137,11 +61,27 @@ inline bool is_move_capture(Move move) {
     return is_move(move, capture) || get_code(move) >= c_npromo;
 }
 
+/// @brief Square helper.
+/// @param sq The square to flip.
+/// @return The reflected square across the rank axis.
+inline Square flip_rank(Square sq) { return sq ^ 56; }
+
+inline int get_file(Square sq) { return sq & 7; }
+inline int get_rank(Square sq) { return sq >> 3; }
+
+/// @brief Colour helper.
+/// @param friendly_colour Colour to get the opposite of.
+/// @return The opposite colour to friendly_colour, no_colour if friendly_colour is no_colour.
+inline Colour opposition_colour(Colour friendly_colour) {
+    if (friendly_colour == no_colour) return no_colour;
+    return friendly_colour ^ 1;
+}
+
 constexpr int MAX_MOVE_LIST_SIZE = 256;
 
 class MoveList {
 private:
-    array<Move, MAX_MOVE_LIST_SIZE> _moves;
+    std::array<Move, MAX_MOVE_LIST_SIZE> _moves;
     size_t _size;
 
 public:
@@ -166,10 +106,9 @@ public:
     }
 };
 
-using Key = uint64_t;
 struct BoardState {
-    array<BB, 15>bitboards{}; // p...kP...K black, white, all
-    array<Piece, 64>piece_list{};
+    std::array<BB, 15>bitboards{}; // p...kP...K black, white, all
+    std::array<Piece, 64>piece_list{};
     Square enpassant_square;
     Colour side_to_move;
     uint8_t castling_rights;
@@ -181,13 +120,10 @@ struct BoardState {
     void reset();
 };
 
-class Board;
-
-using Key = uint64_t;
 namespace zobrist {
-    inline array<Key, 768> piece_keys; // 12 * 64
-    inline array<Key, 4> castling_keys;
-    inline array<Key, 8> ep_file_key;
+    inline std::array<Key, 768> piece_keys; // 12 * 64
+    inline std::array<Key, 4> castling_keys;
+    inline std::array<Key, 8> ep_file_key;
     inline Key side_key;
 
     void init_keys();
@@ -219,12 +155,10 @@ struct SearchParams {
 #define MAX_PLY 64
 #define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
 
-using Score = int;
-
 class Board {
 private:
-    vector<BoardState> prev_states;
-    array<int, MAX_PLY> pv_length = { 0 };
+    std::vector<BoardState> prev_states;
+    std::array<int, MAX_PLY> pv_length = { 0 };
     void update_pv(int ply, int pv_idx, int next_pv_idx);
     Move generate_move_nopromo(Square from_sq, Square to_sq);
     Score quiescence(Score alpha, Score beta, int ply);
@@ -242,7 +176,7 @@ private:
 public:
     SearchParams search_params;
     BoardState state;
-    array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
+    std::array<Move, PV_TABLE_SIZE> pv_table = { nullmove };
 
     Board() {
         move_generator::init_sliding_move_tables();
@@ -251,7 +185,7 @@ public:
         prev_states.push_back(state);
     }
 
-    Board(string fen) {
+    Board(std::string fen) {
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen(fen);
@@ -266,7 +200,7 @@ public:
         prev_states.push_back(state);
     }
 
-    void load_fen(string fen);
+    void load_fen(std::string fen);
     void print_board();
 
     template <bool GEN_CAPTURES>

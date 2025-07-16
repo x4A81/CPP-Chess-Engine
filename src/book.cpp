@@ -1,7 +1,8 @@
-#include "../include/book.hpp"
 #include <fstream>
 #include <algorithm>
-#include <iostream>
+#include <print>
+
+#include "../include/book.hpp"
 
 using namespace polyglot;
 
@@ -23,7 +24,7 @@ bool poly_enpassant_available(BoardState& state) {
 
 PolyKey polyglot::gen_poly_key(BoardState& state) {
     PolyKey key = 0;
-    for (Square sq = 0; sq < 64; sq++) {
+    for (Square sq = 0; sq < 64; ++sq) {
         Piece piece = state.piece_list[sq];
         if (piece > bpieces) continue;
         piece = piece_to_poly_piece[piece];
@@ -57,7 +58,7 @@ PolyKey polyglot::gen_poly_key(BoardState& state) {
 std::vector<BookEntry> polyglot::probe_book(PolyKey key) {
     std::ifstream file(book_path, std::ios::binary);
     if (!file) {
-        std::cout << "info string Failed to open book file: " << book_path << std::endl;
+        std::println("info string Failed to open book file: {}", book_path.string());
         return {};
     }
 

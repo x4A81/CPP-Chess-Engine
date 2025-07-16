@@ -1,18 +1,17 @@
-#include "../include/board.hpp"
-#include "../include/utils.hpp"
-#include "../include/misc.hpp"
-#include "../include/book.hpp"
-#include <iostream>
+#include <print>
 #include <sstream>
 
-using namespace bitboard_utils;
+#include "../include/board.hpp"
+#include "../include/utils.hpp"
+#include "../include/book.hpp"
+
+using namespace bb_math;
 using namespace move_generator;
-using namespace std;
 
 // Clears board flags and bitboards, then resets flags to defaults
 void BoardState::reset() {
-    fill(begin(bitboards), end(bitboards), 0ULL);
-    fill(begin(piece_list), end(piece_list), no_piece);
+    std::fill(begin(bitboards), end(bitboards), 0ULL);
+    std::fill(begin(piece_list), end(piece_list), no_piece);
     enpassant_square = no_square;
     side_to_move = no_colour;
     castling_rights = 0;
@@ -21,11 +20,11 @@ void BoardState::reset() {
     hash_key = 0;
 }
 
-void Board::load_fen(string fen) {
+void Board::load_fen(std::string fen) {
     state.reset();
 
-    istringstream ss(fen);
-    string board_part, stm, castling, enpassant, halfmove, fullmove;
+    std::istringstream ss(fen);
+    std::string board_part, stm, castling, enpassant, halfmove, fullmove;
 
     ss >> board_part >> stm >> castling >> enpassant >> halfmove >> fullmove;
 
@@ -39,7 +38,7 @@ void Board::load_fen(string fen) {
             Piece piece_idx = char_to_piece(c);
             Square flip_sq = flip_rank(sq);  
             state.piece_list[flip_sq] = piece_idx;
-            state.bitboards[piece_idx] |= bitboard_utils::mask(flip_sq);
+            state.bitboards[piece_idx] |= mask(flip_sq);
             sq++;
         }
     }
@@ -80,35 +79,49 @@ void Board::load_fen(string fen) {
 
 void Board::print_board() {
     
-    for (int r = 7; r >= 0; r--) {
-        cout << "+---+---+---+---+---+---+---+---+" << endl;
-        for (int f = 0; f < 8; f++) {
+    for (int r = 7; r >= 0; --r) {
+        std::print("+---+---+---+---+---+---+---+---+\n"); 
+        for (int f = 0; f < 8; ++f) {
             char piece = ' ';
             if (state.piece_list[8*r+f] != no_piece)
                 piece = piece_to_char(state.piece_list[8*r+f]); 
 
-            cout << "| " << piece << " ";
+            std::print("| {} ", piece);
         }
 
-        cout << "| " << r+1 << endl;
+        std::print("| \n");
     }
 
     // Print the board state vars
 
-    cout << "+---+---+---+---+---+---+---+---+\n  a   b   c   d   e   f   g   h" << endl;
-    cout << "Side to move: " << ((state.side_to_move == white) ? "White" : "Black") << endl;
-    cout << "Castling rights: "
-    << ((state.castling_rights & wking_side) ? "K" : "-")
-    << ((state.castling_rights & wqueen_side) ? "Q" : "-")
-    << ((state.castling_rights & bking_side) ? "k" : "-")
-    << ((state.castling_rights & bqueen_side) ? "q" : "-") << endl;
-    
-    cout << "Enpassant square: " << ((state.enpassant_square == no_square) ? "-" : square_to_string(state.enpassant_square)) << endl;
-    cout << "Halfmove clock: " << state.halfmove_clock << endl;
-    cout << "Fullmove counter: " << state.fullmove_counter << endl;
-    cout << "Hash Key: " << state.hash_key << endl;
-    cout << "Poly Key: " << polyglot::gen_poly_key(state) << endl;
-    cout << "Checked: " << is_side_in_check(state.side_to_move) << endl;
+    std::print(
+    "+---+---+---+---+---+---+---+---+\n"
+    "  a   b   c   d   e   f   g   h\n"
+    );
+
+    std::print("Side to move: {}\n",
+        (state.side_to_move == white) ? "White" : "Black"
+    );
+
+    std::print("Castling rights: {}{}{}{}\n",
+        (state.castling_rights & wking_side) ? "K" : "-",
+        (state.castling_rights & wqueen_side) ? "Q" : "-",
+        (state.castling_rights & bking_side) ? "k" : "-",
+        (state.castling_rights & bqueen_side) ? "q" : "-"
+    );
+
+    std::print("Enpassant square: {}\n",
+        (state.enpassant_square == no_square) ? "-" : square_to_string(state.enpassant_square)
+    );
+
+    std::print("Halfmove clock: {}\n", state.halfmove_clock);
+    std::print("Fullmove counter: {}\n", state.fullmove_counter);
+    std::print("Hash Key: {}\n", state.hash_key);
+    std::print("Poly Key: {}\n", polyglot::gen_poly_key(state));
+
+    std::println("Checked: {}",
+        is_side_in_check(state.side_to_move) ? "True" : "No"
+    );
 }
 
 [[gnu::hot]]

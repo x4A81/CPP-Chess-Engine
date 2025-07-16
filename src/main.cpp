@@ -1,11 +1,12 @@
-#include "../include/uci.hpp"
-#include "../include/board.hpp"
-#include "../include/transposition.hpp"
-#include "../include/book.hpp"
 #include <string>
 #include <optional>
 #include <iostream>
 #include <filesystem>
+
+#include "../include/uci.hpp"
+#include "../include/board.hpp"
+#include "../include/transposition.hpp"
+#include "../include/book.hpp"
 
 Board game_board;
 std::optional<Transposition> game_table;

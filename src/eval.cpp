@@ -1,4 +1,7 @@
 #include "../include/eval.hpp"
+#include "../include/globals.hpp"
+
+using namespace bb_math;
 
 Score Board::eval_pawns() {
     bool is_endgame = 

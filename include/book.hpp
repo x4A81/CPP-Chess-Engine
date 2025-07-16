@@ -1,11 +1,12 @@
 #ifndef BOOK_HPP_INCLUDE
 #define BOOK_HPP_INCLUDE
 
-#include "board.hpp"
 #include <cstdint>
 #include <array>
 #include <vector>
 #include <filesystem>
+
+#include "board.hpp"
 
 extern std::filesystem::path book_path;
 

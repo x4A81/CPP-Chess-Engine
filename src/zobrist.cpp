@@ -1,5 +1,5 @@
-#include "../include/board.hpp"
 #include <random>
+#include "../include/board.hpp"
 
 #define SEED 34567
 
@@ -24,7 +24,7 @@ void zobrist::init_keys() {
 
 Key zobrist::gen_pos_key(BoardState& state) {
     Key key = Key(0);
-    for (Square sq = 0; sq < 64; sq++) {
+    for (Square sq = 0; sq < 64; ++sq) {
         Piece piece = state.piece_list.at(sq);
         if (piece > bpieces) continue;
         key ^= piece_keys.at(piece * 64 + sq);

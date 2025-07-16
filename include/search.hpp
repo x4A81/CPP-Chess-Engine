@@ -1,15 +1,13 @@
 #ifndef SEARCH_HPP_INCLUDE
 #define SEARCH_HPP_INCLUDE
 
-#include "board.hpp"
 #include <array>
 #include <atomic>
 #include <chrono>
 #include <cassert>
-#include <mutex>
 #include <condition_variable>
 
-using namespace std;
+#include "globals.hpp"
 
 #define INF 10000
 #define MATE_VALUE 9000
@@ -19,13 +17,13 @@ using namespace std;
 
 #define FUTILITY_MARGIN 125 // 5/4 of a pawn
 
-inline atomic<bool> stop_flag;
+inline std::atomic<bool> stop_flag;
 
-inline array<array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
-inline array<array<array<int, 2>, 64>, 64> history_moves {};
+inline std::array<std::array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
+inline std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
 inline long nodes = 0;
-inline chrono::steady_clock::time_point start_time;
-inline array<Move, PV_TABLE_SIZE> prev_pv_table = { nullmove };
+inline std::chrono::steady_clock::time_point start_time;
+inline std::array<Move, PV_TABLE_SIZE> prev_pv_table = { nullmove };
 
 /// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
 /// @param ply Ply of pv.

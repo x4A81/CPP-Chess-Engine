@@ -1,3 +1,9 @@
+#include <vector>
+#include <sstream>
+#include <thread>
+#include <print>
+#include <string>
+
 #include "../include/uci.hpp"
 #include "../include/utils.hpp"
 #include "../include/board.hpp"
@@ -5,19 +11,13 @@
 #include "../include/transposition.hpp"
 #include "../include/tests.hpp"
 #include "../include/book.hpp"
-#include <iostream>
-#include <vector>
-#include <sstream>
-#include <thread>
-
-using namespace std;
 
 bool is_board_initialised = false;
 
-vector<string> get_tokens(const string& command) {
-    istringstream iss(command);
-    vector<string> tokens;
-    string this_token;
+std::vector<std::string> get_tokens(const std::string& command) {
+    std::istringstream iss(command);
+    std::vector<std::string> tokens;
+    std::string this_token;
     while (iss >> this_token)
         tokens.push_back(this_token);
     
@@ -28,7 +28,7 @@ void stop_search() {
     stop_flag = true;
 }
 
-Move parse_move_string(const string move_str) {
+Move parse_move_string(const std::string move_str) {
     Move move = nullmove;
     Code code = 0;
 
@@ -102,10 +102,10 @@ Move parse_move_string(const string move_str) {
 }
 
 void send_info() {
-    cout << "id name Chess Engine" << endl;
-    cout << "id author x4A81" << endl;
-    cout << "option name Hash type spin default " << (MAX_TT_SIZE_MB+MIN_TT_SIZE_MB)/2 << " min " << MIN_TT_SIZE_MB << " max " << MAX_TT_SIZE_MB << endl;
-    cout << "uciok" << endl;
+    std::print("id name Chess Engine\nid author x4A81\n");
+    std::print("option name Hash type spin default {} min {} max {}\n", 
+        (MAX_TT_SIZE_MB+MIN_TT_SIZE_MB)/2, MIN_TT_SIZE_MB, MAX_TT_SIZE_MB);
+    std::println("uciok");
 }
 
 void setup_engine() {
@@ -118,13 +118,13 @@ void clean() {
     stop_flag.store(true);
 }
 
-void handle_go(const string& command) {
-    vector<string> tokens = get_tokens(command);
+void handle_go(const std::string& command) {
+    std::vector<std::string> tokens = get_tokens(command);
     bool go_perft = false;
     int perft_depth = 0;
 
     for (size_t i = 1; i < tokens.size(); ++i) {
-        const string& tok = tokens[i];
+        const std::string& tok = tokens[i];
         if (tok == "depth" && i + 1 < tokens.size())
             game_board.search_params.max_depth = stoi(tokens[++i]);
         else if (tok == "movetime" && i + 1 < tokens.size())
@@ -174,10 +174,17 @@ void handle_go(const string& command) {
         }
     }
 
-    cout << "info string depth " << game_board.search_params.max_depth << " movetime " << game_board.search_params.move_time
-    << " movestogo " << game_board.search_params.movestogo << " infinite " << game_board.search_params.infinite
-    << " wtime " << game_board.search_params.wtime << " winc " << game_board.search_params.winc
-    << " btime " << game_board.search_params.btime << " binc " << game_board.search_params.binc << endl;
+    std::println("info string depth {} movetime {} movestogo {} infinite {} wtime {} winc {} btime {} binc {}",
+    game_board.search_params.max_depth,
+    game_board.search_params.move_time,
+    game_board.search_params.movestogo,
+    game_board.search_params.infinite,
+    game_board.search_params.wtime,
+    game_board.search_params.winc,
+    game_board.search_params.btime,
+    game_board.search_params.binc
+    );
+
  
     if (go_perft) {
         tests::test_board = game_board;
@@ -186,11 +193,11 @@ void handle_go(const string& command) {
     }
 
     stop_flag.store(false);
-    thread search_thread([]() { game_board.run_search(); });
+    std::thread search_thread([]() { game_board.run_search(); });
     search_thread.detach();
 }
 
-bool handle_command(const string& command) {
+bool handle_command(const std::string& command) {
     if (command == "quit") {
         clean();
         return true;
@@ -204,7 +211,7 @@ bool handle_command(const string& command) {
 
     if (command == "isready") {
         setup_engine();
-        cout << "readyok" << endl;
+        std::println("readyok");
     }
 
     if (command.starts_with("go"))
@@ -216,8 +223,8 @@ bool handle_command(const string& command) {
     }
 
     if (command.starts_with("setoption")) {
-        vector<string> tokens = get_tokens(command);
-        string name, value;
+        std::vector<std::string> tokens = get_tokens(command);
+        std::string name, value;
         for (size_t i = 1; i < tokens.size(); ++i) {
             if (tokens[i] == "name" && i + 1 < tokens.size()) {
                 name = tokens[++i];
@@ -231,17 +238,17 @@ bool handle_command(const string& command) {
             mb = std::clamp(mb, int(MIN_TT_SIZE * TT_ENTRY_SIZE / (1024 * 1024)), int(MAX_TT_SIZE * TT_ENTRY_SIZE / (1024 * 1024)));
             std::size_t entries = (mb * 1024 * 1024) / TT_ENTRY_SIZE;
             game_table.emplace(entries);
-            cout << "info string Hash set to " << mb << " MB" << endl;
+            std::println("info string Hash set to {} MB", mb);
         }
     }
 
     if (command.starts_with("position")) {
-        vector<string> tokens = get_tokens(command);
+        std::vector<std::string> tokens = get_tokens(command);
         int token_idx = 1;
         bool parsing_moves = false;
         while (token_idx < tokens.size()) {
 
-            string this_token = tokens.at(token_idx);
+            std::string this_token = tokens.at(token_idx);
             if (parsing_moves) {
                 game_board.make_move(parse_move_string(this_token));
             } else {
@@ -252,7 +259,7 @@ bool handle_command(const string& command) {
                 
                 else if (this_token == "fen") {
                     // FEN is always 6 tokens: piece placement, active color, castling, en passant, halfmove, fullmove
-                    string fen;
+                    std::string fen;
                     for (int i = 1; i <= 6 && (token_idx + i) < tokens.size(); ++i) {
                         fen += tokens.at(token_idx + i);
                         if (i < 6) fen += " ";
@@ -275,24 +282,29 @@ bool handle_command(const string& command) {
 
     if (command == "d") game_board.print_board();
 
-    if (command == "eval") cout << "info score cp " << ((game_board.state.side_to_move == white) ? game_board.eval() : -game_board.eval()) << endl; // Negate the eval as view from white
+    if (command == "eval") {
+        std::println("info score cp {}",
+            (game_board.state.side_to_move == white) ? game_board.eval() : -game_board.eval()
+        ); // Negate the eval as viewed from white
+    }
 
-    if (command == "usage") cout << "info string tt_usage " << game_table->usage() << "%"<< endl;
+    if (command == "usage") {
+        std::println("info string tt_usage {}%", game_table->usage());
+    }
 
     if (command == "bookmoves") {
-        vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
+        std::vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
 
         if (!entries.empty()) {
             for (auto& pos : entries) {
-                cout << "info string ";
+                std::print("info string ");
                 print_move(polyglot::get_book_move(pos, game_board.state));
-                cout << " weight: " << pos.weight;
-                cout << " learn: " << pos.learn;
-                cout << endl;
+                std::println(" weight: {} learn: {}", pos.weight, pos.learn);
             }
-        } else 
-            cout << "NO ENTRIES";
+        } else {
+            std::println("info string no book entries");
+        }
     }
-
+    
     return false;
 }
