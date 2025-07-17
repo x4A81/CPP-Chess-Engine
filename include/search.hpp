@@ -12,14 +12,13 @@
 #define INF 10000
 #define MATE_VALUE 9000
 #define MAX_DEPTH 20
-#define MAX_PLY 64
-#define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
+#define PV_TABLE_SIZE (max_ply*max_ply+max_ply)/2
 
 #define FUTILITY_MARGIN 125 // 5/4 of a pawn
 
 inline std::atomic<bool> stop_flag;
 
-inline std::array<std::array<Move, 2>, MAX_PLY> killer_moves = {{ nullmove }};
+inline std::array<std::array<Move, 2>, max_ply> killer_moves = {{ nullmove }};
 inline std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
 inline long nodes = 0;
 inline std::chrono::steady_clock::time_point start_time;
@@ -28,12 +27,12 @@ inline std::array<Move, PV_TABLE_SIZE> prev_pv_table = { nullmove };
 /// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
 /// @param ply Ply of pv.
 /// @return The index to the pv table for ply.
-inline int get_pv_index(int ply) { assert(ply < MAX_PLY); return (ply*(2*MAX_PLY+1-ply))/2; }
+inline int get_pv_index(int ply) { assert(ply < max_ply); return (ply*(2*max_ply+1-ply))/2; }
 
 /// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.
 /// @param ply Ply of pv.
 /// @return The index to the pv table for ply + 1.
-inline int get_next_pv_index(int ply) { return get_pv_index(ply) + MAX_PLY - ply; }
+inline int get_next_pv_index(int ply) { return get_pv_index(ply) + max_ply - ply; }
 
 /// @brief Timer helper.
 /// @param start_time Time to compare against.

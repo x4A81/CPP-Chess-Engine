@@ -15,13 +15,15 @@ namespace move_generator {
     /// @brief White pawn attacks helper. See https://www.chessprogramming.org/Pawn_Attacks_(Bitboards)#Attacks_2.
     /// @param pawns Bitboard of pawns.
     /// @return Bitboard of attacks.
+    [[gnu::hot]]
     inline BB wpawn_attacks(BB pawns) {
         return ((pawns << 9) & nAFILE) | (pawns << 7) & nHFILE;
     }
 
     /// @brief Black pawn attacks helper. See https://www.chessprogramming.org/Pawn_Attacks_(Bitboards)#Attacks_2.
     /// @param pawns Bitboard of pawns.
-    /// @return Bitboard of attacks.s
+    /// @return Bitboard of attacks.
+    [[gnu::hot]]
     inline BB bpawn_attacks(BB pawns) {
         return ((pawns >> 9) & nHFILE) | ((pawns >> 7) & nAFILE);
     }
@@ -29,6 +31,7 @@ namespace move_generator {
     /// @brief Knight attacks helper. See https://www.chessprogramming.org/Knight_Pattern#Multiple_Knight_Attacks.
     /// @param knights Bitboard of knights.
     /// @return Bitboard of attacks.
+    [[gnu::hot]]
     inline BB knight_attacks(BB knights) {
         BB l1 = (knights >> 1) & 0x7f7f7f7f7f7f7f7f;
         BB l2 = (knights >> 2) & 0x3f3f3f3f3f3f3f3f;
@@ -42,6 +45,7 @@ namespace move_generator {
     /// @brief King attacks helper. See https://www.chessprogramming.org/King_Pattern#by_Calculation.
     /// @param kings Bitboard of kings.
     /// @return Bitboard of attacks.
+    [[gnu::hot]]
     inline BB king_attacks(BB kings) {
         BB attacks = ((kings >> 1) & nHFILE) | ((kings << 1) & nAFILE);
         kings |= attacks;
@@ -212,6 +216,7 @@ namespace move_generator {
     /// @param sq Rook square.
     /// @param bb Bitboard of blockers.
     /// @return Bitboard of moves.
+    [[gnu::hot]]
     inline BB rook_moves(Square sq, BB bb) {
         bb &= rook_movement_masks[sq];
         bb *= rook_magics[sq];
@@ -223,19 +228,12 @@ namespace move_generator {
     /// @param sq Bishop square.
     /// @param bb Bitboard of blockers.
     /// @return Bitboard of moves.
+    [[gnu::hot]]
     inline BB bishop_moves(Square sq, BB bb) {
         bb &= bishop_movement_masks[sq];
         bb *= bishop_magics[sq];
         bb >>= 64 - bishop_shifts[sq];
         return bishop_movement_table[sq][bb];
-    }
-
-    /// @brief Queen moves helper.
-    /// @param sq Queen square.
-    /// @param bb Bitboard of blockers.
-    /// @return Bitboard of moves.
-    inline BB queen_moves(Square sq, BB bb) {
-        return rook_moves(sq, bb) | bishop_moves(sq, bb);
     }
 } 
 

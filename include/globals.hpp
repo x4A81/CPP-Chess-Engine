@@ -13,6 +13,7 @@ using Code = int;
 using Score = int;
 
 constexpr int nullmove = 0;
+constexpr int max_ply = 128;
 
 /// @brief encoded squares in 'Little-Endian Rank-File Mapping' format.
 /// See https://www.chessprogramming.org/Square_Mapping_Considerations#Little-Endian_File-Rank_Mapping

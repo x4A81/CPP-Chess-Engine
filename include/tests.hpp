@@ -2,6 +2,7 @@
 #define TESTS_HPP_INCLUDE
 
 #include <print>
+#include <chrono>
 
 #include "../include/board.hpp"
 #include "../include/utils.hpp"
@@ -55,8 +56,16 @@ namespace tests {
     /// @param depth Depth to test.
     void test(int depth) {
         positions_searched = 0;
+        std::println("Running at depth {}", depth);
+
+        auto start = std::chrono::high_resolution_clock::now();
         perft_test(depth, true);
-        std::println("Positions searched: ", positions_searched);
+        auto end = std::chrono::high_resolution_clock::now();
+
+        std::chrono::duration<double> elapsed = end - start;
+
+        std::println("Positions searched: {}\nTime taken: {}s\nNPS: {}/s",
+        positions_searched, elapsed.count(), positions_searched / elapsed.count());
     }
 
     /// @brief Runs a perft test, with optional divide.

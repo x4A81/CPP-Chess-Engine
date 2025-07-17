@@ -167,7 +167,7 @@ bool Board::is_side_in_check(Colour side) {
     BB friendly_pieces = (bl & black_mask) | (wh & white_mask);
     BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
     BB opp_any_attacks = 0;
-    int king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
+    Square king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
     BB kingBB = mask(king_sq);
     BB opp_attacks = 0;
 
@@ -234,7 +234,7 @@ void Board::generate_moves() {
     BB hor_inbetween = 0, ver_inbetween = 0, dia_inbetween = 0, antdia_inbetween = 0;
     BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
     BB opp_any_attacks = 0;
-    int king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
+    Square king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
     BB king_super_dia = bishop_moves(king_sq, occ);
     BB king_super_orth = rook_moves(king_sq, occ);
     BB kingBB = mask(king_sq);
@@ -552,27 +552,30 @@ void Board::generate_moves() {
 template void Board::generate_moves<CAPTURES>();
 template void Board::generate_moves<ALLMOVES>();
 
+void Board::make_null_move() {
+    prev_states.push_back(state);
+    if (state.side_to_move == black) state.fullmove_counter++;
+    state.side_to_move = state.side_to_move ^ 1;
+    state.hash_key ^= zobrist::side_key;
+    state.enpassant_square = no_square;
+    state.halfmove_clock = 0;
+}
+
 [[gnu::hot]]
 void Board::make_move(Move move) {
     prev_states.push_back(state);
     Key& key = state.hash_key;
-
-    if (move == nullmove) {
-        if (state.side_to_move == black) state.fullmove_counter++;
-        state.side_to_move = state.side_to_move ^ 1;
-        key ^= zobrist::side_key;
-        state.enpassant_square = no_square;
-        state.halfmove_clock = 0;
-        return;
-    }
-
     Square from_sq = get_from_sq(move), to_sq = get_to_sq(move);
     Piece piece = state.piece_list[from_sq];
     Colour piece_colour = piece <= 5 ? bpieces : wpieces;
     Code move_code = get_code(move);
 
     Colour turn = state.side_to_move;
-
+    if (piece == 15) {
+        for (auto s: prev_states) {
+            print_piece_list(s.piece_list);
+        }
+    }
     // Remove piece from source
     pop_bit(state.bitboards[piece], from_sq);
     pop_bit(state.bitboards[piece_colour], from_sq);
@@ -682,18 +685,23 @@ void Board::make_move(Move move) {
     }
 
     // Castling rights
-    if (state.castling_rights & wking_side) key ^= zobrist::castling_keys[0];
-    if (state.castling_rights & wqueen_side) key ^= zobrist::castling_keys[1];
-    if (state.castling_rights & bking_side) key ^= zobrist::castling_keys[2];
-    if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
+    CastlingRights from_castling = castle_encoder[from_sq];
+    CastlingRights to_castling = castle_encoder[to_sq];
+    if (from_castling != 15 || to_castling != 15) {
 
-    state.castling_rights &= castle_encoder[from_sq];
-    state.castling_rights &= castle_encoder[to_sq];
-
-    if (state.castling_rights & wking_side) key ^= zobrist::castling_keys[0];
-    if (state.castling_rights & wqueen_side) key ^= zobrist::castling_keys[1];
-    if (state.castling_rights & bking_side) key ^= zobrist::castling_keys[2];
-    if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
+        if (state.castling_rights & wking_side) key ^= zobrist::castling_keys[0];
+        if (state.castling_rights & wqueen_side) key ^= zobrist::castling_keys[1];
+        if (state.castling_rights & bking_side) key ^= zobrist::castling_keys[2];
+        if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
+    
+        state.castling_rights &= from_castling;
+        state.castling_rights &= to_castling;
+    
+        if (state.castling_rights & wking_side) key ^= zobrist::castling_keys[0];
+        if (state.castling_rights & wqueen_side) key ^= zobrist::castling_keys[1];
+        if (state.castling_rights & bking_side) key ^= zobrist::castling_keys[2];
+        if (state.castling_rights & bqueen_side) key ^= zobrist::castling_keys[3];
+    }
 
     // Update counters and side to move
     if (turn == black) state.fullmove_counter++;

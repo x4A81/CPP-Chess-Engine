@@ -22,7 +22,7 @@ enum CastlingRightsEncoder : CastlingRights {
 };
 
 /// @brief Castling rights helper.
-inline constexpr std::array<int, 64> castle_encoder = {
+inline constexpr std::array<CastlingRights, 64> castle_encoder = {
     13, 15, 15, 15, 12, 15, 15, 14,
     15, 15, 15, 15, 15, 15, 15, 15,
     15, 15, 15, 15, 15, 15, 15, 15,
@@ -152,13 +152,12 @@ struct SearchParams {
 
 #define CAPTURES true
 #define ALLMOVES false
-#define MAX_PLY 64
-#define PV_TABLE_SIZE (MAX_PLY*MAX_PLY+MAX_PLY)/2
+#define PV_TABLE_SIZE (max_ply*max_ply+max_ply)/2
 
 class Board {
 private:
     std::vector<BoardState> prev_states;
-    std::array<int, MAX_PLY> pv_length = { 0 };
+    std::array<int, max_ply> pv_length = { 0 };
     void update_pv(int ply, int pv_idx, int next_pv_idx);
     Move generate_move_nopromo(Square from_sq, Square to_sq);
     Score quiescence(Score alpha, Score beta, int ply);
@@ -207,6 +206,7 @@ public:
     [[gnu::hot]]
     void generate_moves();
     bool is_side_in_check(Colour side);
+    void make_null_move();
     [[gnu::hot]]
     void make_move(Move move);
     [[gnu::hot]]

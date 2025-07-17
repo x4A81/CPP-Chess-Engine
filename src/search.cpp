@@ -203,7 +203,7 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
 
         if (score > alpha) {
             pv_table[0] = move;
-            update_pv(0, 0, MAX_PLY);
+            update_pv(0, 0, max_ply);
             alpha = score;
             ent = EXACT;
         }
@@ -290,7 +290,7 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
 
     if (do_null_pruning) {
         int R = depth > 6 ? 4 : 3;
-        make_move(nullmove);
+        make_null_move();
         score = -search(depth - R, ply + 1, -beta, -beta + 1, false, false);
         unmake_last_move();
         if (score >= beta) return score;
@@ -507,7 +507,7 @@ void Board::run_search() {
             std::print(" score cp {}", score);
         else {
             // Mate is printed in moves not plies, hence halving and +/- 1.
-            int moves_to_mate = (score > 0) ? (MATE_VALUE - score) / 2 + 1 : -(MATE_VALUE + score) / 2 - 1;
+            int moves_to_mate = (score > 0) ? (MATE_VALUE - score + 1) / 2 : -(MATE_VALUE + score + 1) / 2;
             std::print(" score mate {}", moves_to_mate);
         }
 
