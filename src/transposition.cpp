@@ -60,8 +60,10 @@ void Transposition::store_entry(TranspositionEntry& entry) {
     int index = entry.key & (transposition_size - 1);
     TranspositionEntry *table_entry = &transposition_tt[index];
 
-    // Depth preferred replacement strategy.
-    if ((table_entry->key == entry.key && table_entry->depth < entry.depth) || table_entry->key == 0)
+    // Depth preferred and ageing replacement strategy.
+    if (table_entry->key == 0 || 
+        (table_entry->key == entry.key && 
+            (table_entry->depth <= entry.depth && table_entry->age < entry.age)))
         *table_entry = entry;
 }
 

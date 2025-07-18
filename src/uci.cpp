@@ -13,6 +13,7 @@
 #include "../include/book.hpp"
 
 bool is_board_initialised = false;
+std::size_t hash_size = (MAX_TT_SIZE_MB+MIN_TT_SIZE_MB)/2;
 
 std::vector<std::string> get_tokens(const std::string& command) {
     std::istringstream iss(command);
@@ -111,7 +112,7 @@ void send_info() {
 void setup_engine() {
     if (!is_board_initialised) game_board = Board(1);
     // setup transposition table and search thread
-    if (!game_table.has_value()) game_table.emplace((MAX_TT_SIZE_MB+MIN_TT_SIZE_MB)/2);
+    if (!game_table.has_value()) game_table.emplace(hash_size);
 }
 
 void clean() {
@@ -220,6 +221,7 @@ bool handle_command(const std::string& command) {
     if (command == "ucinewgame") {
         game_board = Board(1);
         game_board.clean_search();
+        game_table.emplace(hash_size);
     }
 
     if (command.starts_with("setoption")) {
@@ -236,8 +238,8 @@ bool handle_command(const std::string& command) {
         if (name == "Hash" && !value.empty()) {
             int mb = stoi(value);
             mb = std::clamp(mb, int(MIN_TT_SIZE * TT_ENTRY_SIZE / (1024 * 1024)), int(MAX_TT_SIZE * TT_ENTRY_SIZE / (1024 * 1024)));
-            std::size_t entries = (mb * 1024 * 1024) / TT_ENTRY_SIZE;
-            game_table.emplace(entries);
+            hash_size = (mb * 1024 * 1024) / TT_ENTRY_SIZE;
+            game_table.emplace(hash_size);
             std::println("info string Hash set to {} MB", mb);
         }
     }

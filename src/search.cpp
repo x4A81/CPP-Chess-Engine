@@ -275,6 +275,7 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
     }
 
     generate_moves<ALLMOVES>();
+
     order_moves(entry ? entry->hash_move : nullmove, ply);
     
     Score score = 0;
@@ -306,20 +307,27 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
     }
 
     bool f_prune = 
-    (depth < 3) && !state.is_in_check && !is_pv_node && (abs(alpha) < MATE_VALUE)
-    && (static_eval + (FUTILITY_MARGIN * depth * depth) <= alpha);
-
+    (depth < 3) && !state.is_in_check && !is_pv_node && (abs(alpha) < MATE_VALUE);
     for (Move move : state.move_list) {
         make_move(move);
         
         // Futility Pruning
         if (f_prune && !is_side_in_check(state.side_to_move) 
-        && is_move(move, capture) && (get_code(move) < npromo)) {
+        && is_move(move, capture) && (get_code(move) < npromo)
+        && (static_eval + (FUTILITY_MARGIN * depth * depth) <= alpha)) {
             unmake_last_move();
             continue;
         }
-        
+
         // Late Move Pruning
+        if (f_prune && !is_side_in_check(state.side_to_move) 
+        && is_move(move, capture) && (get_code(move) < npromo)
+        && moves_searched > 5) {
+            unmake_last_move();
+            continue;
+        }
+
+        // Late Move Reductions
         int reduction = 0;
         if (!is_pv_node && new_depth > 3 && moves_searched > 3
             && !is_move(move, capture) && get_code(move) < npromo && !state.is_in_check) {
@@ -445,7 +453,11 @@ void Board::run_search() {
     std::vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
 
     if (!entries.empty()) {
-        int idx = choose_weighted_book_move(entries);
+        #ifdef TOPBOOK
+            int idx = 0; // always choose top book move
+        #else
+            int idx = choose_weighted_book_move(entries); // weighted random
+        #endif
         polyglot::BookEntry chosen = entries[idx];
         std::println("info string book move\nbestmove {}", move_to_string(polyglot::get_book_move(chosen, game_board.state)));
         std::fflush(stdout);
@@ -466,8 +478,6 @@ void Board::run_search() {
     Score alpha = -INF, beta = INF;
     start_time = std::chrono::steady_clock::now();
     int d = 1;
-
-    // Aspiration windows vars. See https://www.chessprogramming.org/Aspiration_Windows.
 
     // Decay history heuristic.
     for (int* p = &history_moves[0][0][0]; p != &history_moves[0][0][0] + 64*64*2; ++p)

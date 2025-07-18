@@ -19,6 +19,7 @@ struct alignas(64) TranspositionEntry {
     Key key;
     Move hash_move;
     int depth;
+    int age;
     Score score;
     EntryType type;
 };

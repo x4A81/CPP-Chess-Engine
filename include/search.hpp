@@ -23,6 +23,7 @@ inline std::array<std::array<std::array<int, 2>, 64>, 64> history_moves {};
 inline long nodes = 0;
 inline std::chrono::steady_clock::time_point start_time;
 inline std::array<Move, PV_TABLE_SIZE> prev_pv_table = { nullmove };
+inline std::array<Move, PV_TABLE_SIZE> iid_pv_table = { nullmove };
 inline Move fallback = nullmove;
 
 /// @brief PV table helper. See https://www.chessprogramming.org/Triangular_PV-Table#Index.

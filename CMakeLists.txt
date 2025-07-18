@@ -30,6 +30,9 @@ target_compile_options(Engine PRIVATE
     $<$<CONFIG:Release>:-O3 -march=native -DNDEBUG>
 )
 
+# Can comment out to make the engine play a variaty of book moves.
+target_compile_definitions(Engine PRIVATE TOPBOOK) 
+
 # Copy book.bin to output folder after build
 add_custom_command(TARGET Engine POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
