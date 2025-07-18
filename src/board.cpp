@@ -340,7 +340,7 @@ void Board::generate_moves() {
     while (sliders) {
         Square from_sq = pop_lsb(sliders);
 
-        BB slider_movement = rook_moves(from_sq, occ) & move_mask & hor_fill(from_sq);
+        BB slider_movement = rook_moves(from_sq, occ) & move_mask & precomp_hor_fill[from_sq];
         while (slider_movement) {
             Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
@@ -352,7 +352,7 @@ void Board::generate_moves() {
     while (sliders) {
         Square from_sq = pop_lsb(sliders);
 
-        BB slider_movement = rook_moves(from_sq, occ) & move_mask & ver_fill(from_sq);
+        BB slider_movement = rook_moves(from_sq, occ) & move_mask & precomp_ver_fill[from_sq];
         while (slider_movement) {
             Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
@@ -367,7 +367,7 @@ void Board::generate_moves() {
     while (sliders) {
         Square from_sq = pop_lsb(sliders);
 
-        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & dia_fill(from_sq);
+        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & precomp_dia_fill[from_sq];
         while (slider_movement) {
             Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
@@ -379,7 +379,7 @@ void Board::generate_moves() {
     while (sliders) {
         Square from_sq = pop_lsb(sliders);
 
-        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & antdia_fill(from_sq);
+        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & precomp_antdia_fill[from_sq];
         while (slider_movement) {
             Square to_sq = pop_lsb(slider_movement);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
@@ -423,7 +423,7 @@ void Board::generate_moves() {
     while (attacking) {
         Square from_sq = pop_lsb(attacking);
 
-        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & dia_fill(from_sq);
+        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & precomp_dia_fill[from_sq];
         while (movement_mask) {
             Square to_sq = pop_lsb(movement_mask);
 
@@ -432,7 +432,7 @@ void Board::generate_moves() {
                     BB c_occ = occ;
                     pop_bit(c_occ, from_sq);
                     pop_bit(c_occ, (state.side_to_move == white ? to_sq - 8 : to_sq + 8));
-                    if (hor_fill(king_sq) & rook_moves(king_sq, c_occ) & opp_rooks) {
+                    if (precomp_hor_fill[king_sq] & rook_moves(king_sq, c_occ) & opp_rooks) {
                         // enpassant is not legal
                         continue;
                     }
@@ -456,7 +456,7 @@ void Board::generate_moves() {
     while (attacking) {
         Square from_sq = pop_lsb(attacking);
 
-        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & antdia_fill(from_sq);
+        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & precomp_antdia_fill[from_sq];
         while (movement_mask) {
             Square to_sq = pop_lsb(movement_mask);
 
@@ -465,7 +465,7 @@ void Board::generate_moves() {
                     BB c_occ = occ;
                     pop_bit(c_occ, from_sq);
                     pop_bit(c_occ, (state.side_to_move == white ? to_sq - 8 : to_sq + 8));
-                    if (hor_fill(king_sq) & rook_moves(king_sq, c_occ) & opp_rooks) {
+                    if (precomp_hor_fill[king_sq] & rook_moves(king_sq, c_occ) & opp_rooks) {
                         // enpassant is not legal
                         continue;
                     }
@@ -493,11 +493,11 @@ void Board::generate_moves() {
                 (state.castling_rights & wking_side)
                 
                 // Squares king travel aren't attacked
-                && !(get_bit(opp_any_attacks, f1) || get_bit(opp_any_attacks, g1))
+                && ((opp_any_attacks & (mask(f1) | mask(g1))) == 0)
                 
                 // There are no pieces between king & rook
                 
-                && !(get_bit(occ, f1) || get_bit(occ, g1))
+                && ((occ & (mask(f1) | mask(g1))) == 0)
                 
             )
             state.move_list.add(generate_move_nopromo(e1, g1));
@@ -507,11 +507,11 @@ void Board::generate_moves() {
                 (state.castling_rights & wqueen_side)
 
                 // Squares king travel aren't attacked
-                && !(get_bit(opp_any_attacks, d1) || get_bit(opp_any_attacks, c1))
+                && ((opp_any_attacks & (mask(d1) | mask(c1))) == 0)
 
                 // There are no pieces between king & rook
 
-                && !(get_bit(occ, d1) || get_bit(occ, c1) || get_bit(occ, b1))
+                && ((occ & (mask(d1) | mask(c1) | mask(b1))) == 0)
             
             )
             state.move_list.add(generate_move_nopromo(e1, c1));
@@ -522,11 +522,11 @@ void Board::generate_moves() {
                 (state.castling_rights & bking_side)
 
                 // Squares king travel aren't attacked
-                && !(get_bit(opp_any_attacks, f8) || get_bit(opp_any_attacks, g8))
-
+                && ((opp_any_attacks & (mask(f8) | mask(g8))) == 0)
+                
                 // There are no pieces between king & rook
-
-                && !(get_bit(occ, f8) || get_bit(occ, g8))
+                
+                && ((occ & (mask(f8) | mask(g8))) == 0)
             
             )
             state.move_list.add(generate_move_nopromo(e8, g8));
@@ -536,11 +536,11 @@ void Board::generate_moves() {
                 (state.castling_rights & bqueen_side)
 
                 // Squares king travel aren't attacked
-                && !(get_bit(opp_any_attacks, d8) || get_bit(opp_any_attacks, c8))
+                && ((opp_any_attacks & (mask(d8) | mask(c8))) == 0)
 
                 // There are no pieces between king & rook
 
-                && !(get_bit(occ, d8) || get_bit(occ, c8) || get_bit(occ, b8))
+                && ((occ & (mask(d8) | mask(c8) | mask(b8))) == 0)
             
             )
             state.move_list.add(generate_move_nopromo(e8, c8));
@@ -570,118 +570,110 @@ void Board::make_move(Move move) {
     Colour piece_colour = piece <= 5 ? bpieces : wpieces;
     Code move_code = get_code(move);
 
-    Colour turn = state.side_to_move;
-    if (piece == 15) {
-        for (auto s: prev_states) {
-            print_piece_list(s.piece_list);
-        }
-    }
-    // Remove piece from source
-    pop_bit(state.bitboards[piece], from_sq);
-    pop_bit(state.bitboards[piece_colour], from_sq);
-    key ^= zobrist::piece_keys[piece * 64 + from_sq];
-    state.piece_list[from_sq] = no_piece;
+    bool white_tm = state.side_to_move == white;
+    Colour c_piece_colour;
+    Square ep = state.enpassant_square, cap_sq;
+    key ^= zobrist::ep_file_key[get_file(ep)];
+    Piece promo_piece, c_piece;
+    state.enpassant_square = no_square;
 
-    // Handle captures
+    // Remove the captured piece.
     if (move_code == capture || move_code >= c_npromo) {
-        Piece c_piece = state.piece_list[to_sq];
-        Colour c_piece_colour = c_piece <= 5 ? bpieces : wpieces;
+        c_piece = state.piece_list[to_sq];
+        c_piece_colour = white_tm ? bpieces : wpieces;
         pop_bit(state.bitboards[c_piece], to_sq);
         pop_bit(state.bitboards[c_piece_colour], to_sq);
-
         key ^= zobrist::piece_keys[c_piece * 64 + to_sq];
     }
 
-    // Handle en passant
+    // Remove the pawn.
     else if (move_code == epcapture) {
-        Square cap_sq = turn == white ? state.enpassant_square - 8 : state.enpassant_square + 8;
-        Piece cap_piece = turn == white ? p : P;
-        Colour c_piece_colour = turn ^ 1;
-        pop_bit(state.bitboards[cap_piece], cap_sq);
+        cap_sq = white_tm ? ep - 8 : ep + 8;
+        c_piece = white_tm ? p : P;
+        c_piece_colour = white_tm ? bpieces : wpieces;
+        pop_bit(state.bitboards[c_piece], cap_sq);
         pop_bit(state.bitboards[c_piece_colour], cap_sq);
         state.piece_list[cap_sq] = no_piece;
-        key ^= zobrist::piece_keys[cap_piece * 64 + cap_sq];
+        key ^= zobrist::piece_keys[c_piece * 64 + cap_sq];
     }
 
-    // Move piece to destination
-    set_bit(state.bitboards[piece], to_sq);
-    set_bit(state.bitboards[piece_colour], to_sq);
-    key ^= zobrist::piece_keys[piece * 64 + to_sq];
+    // Move the piece
+    state.bitboards[piece] ^= mask(from_sq) | mask(to_sq);
+    state.bitboards[piece_colour] ^= mask(from_sq) | mask(to_sq);
+    state.piece_list[from_sq] = no_piece;
     state.piece_list[to_sq] = piece;
+    key ^= zobrist::piece_keys[piece * 64 + from_sq];
+    key ^= zobrist::piece_keys[piece * 64 + to_sq];
 
-    // Promotions
-    if (move_code >= npromo) {
+    // Update enpassant sq.
+    if (move_code == dbpush) {
+        state.enpassant_square = white_tm ? to_sq - 8 : to_sq + 8;
+        key ^= zobrist::ep_file_key[get_file(state.enpassant_square)];
+    }
+
+    else if (move_code == kcastle) {
+        // Move the rook.
+        if (white_tm) {
+            state.bitboards[R] ^= mask(h1) | mask(f1);
+            state.bitboards[wpieces] ^= mask(h1) | mask(f1);
+            key ^= zobrist::piece_keys[R * 64 + h1];
+            key ^= zobrist::piece_keys[R * 64 + f1];
+            state.piece_list[h1] = no_piece;
+            state.piece_list[f1] = R;
+        } else {
+            state.bitboards[r] ^= mask(h8) | mask(f8);
+            state.bitboards[bpieces] ^= mask(h8) | mask(f8);
+            key ^= zobrist::piece_keys[r * 64 + h8];
+            key ^= zobrist::piece_keys[r * 64 + f8];
+            state.piece_list[h8] = no_piece;
+            state.piece_list[f8] = r;
+        }
+    }
+
+    else if (move_code == qcastle) {
+        if (white_tm) {
+            state.bitboards[R] ^= mask(a1) | mask(d1);
+            state.bitboards[wpieces] ^= mask(a1) | mask(d1);
+            key ^= zobrist::piece_keys[R * 64 + a1];
+            key ^= zobrist::piece_keys[R * 64 + d1];
+            state.piece_list[a1] = no_piece;
+            state.piece_list[d1] = R;
+        } else {
+            state.bitboards[r] ^= mask(a8) | mask(d8);
+            state.bitboards[bpieces] ^= mask(a8) | mask(d8);
+            key ^= zobrist::piece_keys[r * 64 + a8];
+            key ^= zobrist::piece_keys[r * 64 + d8];
+            state.piece_list[a8] = no_piece;
+            state.piece_list[d8] = r;
+        }
+    }
+
+    else if (move_code >= npromo) {
+        switch (move_code)
+        {
+            case c_npromo:
+            case npromo: promo_piece = white_tm ? N : n; break;
+            
+            case c_bpromo:
+            case bpromo: promo_piece = white_tm ? B : b; break;
+            
+            case c_rpromo:
+            case rpromo: promo_piece = white_tm ? R : r; break;
+            
+            case c_qpromo:
+            case qpromo: promo_piece = white_tm ? Q : q; break;
+            default:
+            break;
+        }
+        
+        // Remove the pawn.
         pop_bit(state.bitboards[piece], to_sq);
         key ^= zobrist::piece_keys[piece * 64 + to_sq];
 
-        Piece promo_piece;
-        switch (move_code) {
-            case npromo: case c_npromo: promo_piece = turn == white ? N : n; break;
-            case bpromo: case c_bpromo: promo_piece = turn == white ? B : b; break;
-            case rpromo: case c_rpromo: promo_piece = turn == white ? R : r; break;
-            case qpromo: case c_qpromo: promo_piece = turn == white ? Q : q; break;
-        }
-
+        // Update the occupancy.
         set_bit(state.bitboards[promo_piece], to_sq);
-        key ^= zobrist::piece_keys[promo_piece * 64 + to_sq];
         state.piece_list[to_sq] = promo_piece;
-    }
-
-    // Castling
-    else if (move_code == kcastle || move_code == qcastle) {
-        if (state.side_to_move == white) {
-            if (move_code == kcastle) {
-                pop_bit(state.bitboards[R], h1);
-                pop_bit(state.bitboards[piece_colour], h1);
-                key ^= zobrist::piece_keys[R * 64 + h1];
-                set_bit(state.bitboards[R], f1);
-                set_bit(state.bitboards[piece_colour], f1);
-                key ^= zobrist::piece_keys[R * 64 + f1];
-                state.piece_list[h1] = no_piece;
-                state.piece_list[f1] = R;
-            } else {
-                pop_bit(state.bitboards[R], a1);
-                pop_bit(state.bitboards[piece_colour], a1);
-                key ^= zobrist::piece_keys[R * 64 + a1];
-                set_bit(state.bitboards[R], d1);
-                set_bit(state.bitboards[piece_colour], d1);
-                key ^= zobrist::piece_keys[R * 64 + d1];
-                state.piece_list[a1] = no_piece;
-                state.piece_list[d1] = R;
-            }
-        } else {
-            if (move_code == kcastle) {
-                pop_bit(state.bitboards[r], h8);
-                pop_bit(state.bitboards[piece_colour], h8);
-                key ^= zobrist::piece_keys[r * 64 + h8];
-                set_bit(state.bitboards[r], f8);
-                set_bit(state.bitboards[piece_colour], f8);
-                key ^= zobrist::piece_keys[r * 64 + f8];
-                state.piece_list[h8] = no_piece;
-                state.piece_list[f8] = r;
-            } else {
-                pop_bit(state.bitboards[r], a8);
-                pop_bit(state.bitboards[piece_colour], a8);
-                key ^= zobrist::piece_keys[r * 64 + a8];
-                set_bit(state.bitboards[r], d8);
-                set_bit(state.bitboards[piece_colour], d8);
-                key ^= zobrist::piece_keys[r * 64 + d8];
-                state.piece_list[a8] = no_piece;
-                state.piece_list[d8] = r;
-            }
-        }
-    }
-
-    // Remove old en passant key
-    if (state.enpassant_square != no_square) {
-        key ^= zobrist::ep_file_key[state.enpassant_square & 7];
-    }
-
-    if (move_code == dbpush) {
-        state.enpassant_square = state.side_to_move == white ? to_sq - 8 : to_sq + 8;
-        key ^= zobrist::ep_file_key[state.enpassant_square & 7];
-    } else {
-        state.enpassant_square = no_square;
+        key ^= zobrist::piece_keys[promo_piece * 64 + to_sq];
     }
 
     // Castling rights
@@ -704,14 +696,14 @@ void Board::make_move(Move move) {
     }
 
     // Update counters and side to move
-    if (turn == black) state.fullmove_counter++;
+    if (state.side_to_move == black) state.fullmove_counter++;
     state.halfmove_clock = (move_code == capture || piece == p || piece == P) ? 0 : state.halfmove_clock + 1;
 
-    state.side_to_move = turn ^ 1;
+    state.side_to_move ^= 1;
     key ^= zobrist::side_key;
 
     // Recalculate all-piece sets
-    state.bitboards[14] = state.bitboards[12] | state.bitboards[13];
+    state.bitboards[allpieces] = state.bitboards[bpieces] | state.bitboards[wpieces];
 }
 
 [[gnu::hot]]
