@@ -85,8 +85,12 @@ private:
     size_t _size;
 
 public:
+    MoveList() : _size(0) {
+        _moves.fill(nullmove);
+    }
+
     [[gnu::hot]]
-    void add(Move move) { _moves.at(_size++) = move; }
+    void add(Move move) { _moves[_size++] = move; }
 
     void clear() {
         _moves.fill(nullmove);
@@ -156,14 +160,16 @@ struct SearchParams {
 
 class Board {
 private:
-    std::vector<BoardState> prev_states;
+    // std::vector<BoardState> prev_states;
+    std::array<BoardState, max_ply+1> prev_states;
+    size_t prev_state_idx = 0;
     std::array<int, max_ply> pv_length = { 0 };
     void update_pv(int ply, int pv_idx, int next_pv_idx);
     Move generate_move_nopromo(Square from_sq, Square to_sq);
     Score quiescence(Score alpha, Score beta, int ply);
     Score search(int depth, int ply, Score alpha, Score beta, bool is_pv_node, bool null_move_allowed = true);
     Score search_root(int depth, Score alpha, Score beta);
-    bool is_search_stopped();
+    bool is_search_stopped(int ply);
     void order_moves(Move hash_move, int ply);
     Score eval_pawns();
     Score eval_knights();
@@ -181,14 +187,16 @@ public:
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         state.reset();
-        prev_states.push_back(state);
+        // prev_states.push_back(state);
+        prev_states[prev_state_idx] = state;
     }
 
     Board(std::string fen) {
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen(fen);
-        prev_states.push_back(state);
+        // prev_states.push_back(state);
+        prev_states[prev_state_idx] = state;
     }
 
     Board(bool load_start) {
@@ -196,7 +204,8 @@ public:
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        prev_states.push_back(state);
+        // prev_states.push_back(state);
+        prev_states[prev_state_idx] = state;
     }
 
     void load_fen(std::string fen);

@@ -553,7 +553,9 @@ template void Board::generate_moves<CAPTURES>();
 template void Board::generate_moves<ALLMOVES>();
 
 void Board::make_null_move() {
-    prev_states.push_back(state);
+    // prev_states.push_back(state);
+    prev_state_idx++;
+    prev_states[prev_state_idx] = state;
     if (state.side_to_move == black) state.fullmove_counter++;
     state.side_to_move = state.side_to_move ^ 1;
     state.hash_key ^= zobrist::side_key;
@@ -563,7 +565,9 @@ void Board::make_null_move() {
 
 [[gnu::hot]]
 void Board::make_move(Move move) {
-    prev_states.push_back(state);
+    // prev_states.push_back(state);
+    prev_state_idx++;
+    prev_states[prev_state_idx] = state;
     Key& key = state.hash_key;
     Square from_sq = get_from_sq(move), to_sq = get_to_sq(move);
     Piece piece = state.piece_list[from_sq];
@@ -665,7 +669,7 @@ void Board::make_move(Move move) {
             default:
             break;
         }
-        
+
         // Remove the pawn.
         pop_bit(state.bitboards[piece], to_sq);
         key ^= zobrist::piece_keys[piece * 64 + to_sq];
@@ -708,10 +712,12 @@ void Board::make_move(Move move) {
 
 [[gnu::hot]]
 void Board::unmake_last_move() {
-    if (prev_states.size() > 1) {
-        state = prev_states.back();
-        prev_states.pop_back();
-    }
+    // if (prev_states.size() > 1) {
+    //     state = prev_states.back();
+    //     prev_states.pop_back();
+    // }
+    state = prev_states[prev_state_idx];
+    prev_state_idx--;
 }
 
 bool Board::is_rep() {

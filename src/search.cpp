@@ -37,9 +37,11 @@ void Board::update_pv(int ply, int pv_idx, int next_pv_idx) {
     } else pv_length[ply] = 1;
 }
 
-bool Board::is_search_stopped() {
+bool Board::is_search_stopped(int ply) {
     if (stop_flag.load())
         return true;
+
+    if (ply > max_ply) return true;
 
     // Time check
     if (search_params.move_time > 0) {
@@ -130,7 +132,7 @@ Score Board::quiescence(Score alpha, Score beta, int ply) {
 
     order_moves(nullmove, ply);
     
-    if (is_search_stopped()) return best_val; 
+    if (is_search_stopped(ply)) return best_val; 
     
     for (Move move : state.move_list) {
         if (!is_move_capture(move) && !check_flag) continue;
@@ -145,7 +147,7 @@ Score Board::quiescence(Score alpha, Score beta, int ply) {
         
         if (score > best_val) best_val = score;
         if (score > alpha) alpha = score;
-        if (is_search_stopped()) break;
+        if (is_search_stopped(ply)) break;
     }
 
     return best_val;
@@ -210,7 +212,7 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
             ent = EXACT;
         }
 
-        if (is_search_stopped()) return alpha;
+        if (is_search_stopped(0)) return alpha;
     }
 
     if (alpha <= old_alpha)
@@ -386,7 +388,7 @@ Score Board::search(int depth, int ply, Score alpha, Score beta, bool is_pv_node
             alpha = score;
         }
 
-        if (is_search_stopped()) break;
+        if (is_search_stopped(ply)) break;
     }
 
     if (state.move_list.is_empty()) {
@@ -496,7 +498,7 @@ void Board::run_search() {
             aw_research = true;
         }
 
-        if (is_search_stopped()) break;
+        if (is_search_stopped(0)) break;
 
         if (aw_research) continue;
 
