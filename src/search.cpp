@@ -144,6 +144,11 @@ Score Board::quiescence(Score alpha, Score beta, int ply) {
         unmake_last_move();
 
         if (score >= beta) return score;
+
+        // Delta Pruning.
+        int delta = 975;
+        if (get_code(move) >= c_npromo) delta += 775;
+        if (score < alpha - delta) return alpha;
         
         if (score > best_val) best_val = score;
         if (score > alpha) alpha = score;
