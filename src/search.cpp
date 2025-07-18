@@ -157,9 +157,10 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
     int moves_searched = 0;
     EntryType ent = UPPER;
     Score old_alpha = alpha;
-
+    
     generate_moves<ALLMOVES>();
     order_moves(nullmove, 0);
+    fallback = state.move_list[0];
 
     for (Move move : state.move_list) {
         make_move(move);
@@ -203,6 +204,7 @@ Score Board::search_root(int depth, Score alpha, Score beta) {
 
         if (score > alpha) {
             pv_table[0] = move;
+            fallback = move;
             update_pv(0, 0, max_ply);
             alpha = score;
             ent = EXACT;
@@ -527,6 +529,6 @@ void Board::run_search() {
     }
 
     stop_flag.store(true);
-    std::println("bestmove {}", move_to_string(prev_pv_table[0]));
+    std::println("bestmove {}", move_to_string(prev_pv_table[0] == nullmove ? fallback : prev_pv_table[0]));
     std::fflush(stdout);
 }
