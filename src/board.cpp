@@ -153,8 +153,8 @@ Move Board::generate_move_nopromo(Square from_sq, Square to_sq) {
     return move | (code << 12);
 }
 
-bool Board::is_side_in_check(Colour side) {
-    BB white_mask = -(side == white); // All 1s if white to move, else 0s
+BB Board::get_attacked_BB(Colour side) {
+    BB white_mask = -(side == white); // All 1s if white
     BB black_mask = ~white_mask;
 
     BB wh = state.bitboards[wpieces];
@@ -168,7 +168,6 @@ bool Board::is_side_in_check(Colour side) {
     BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
     BB opp_any_attacks = 0;
     Square king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
-    BB kingBB = mask(king_sq);
     BB opp_attacks = 0;
 
     BB opp_rooks = (state.bitboards[r] | state.bitboards[R] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
@@ -208,7 +207,31 @@ bool Board::is_side_in_check(Colour side) {
     else
         opp_any_attacks |= wpawn_attacks(state.bitboards[P]);
 
-    return opp_any_attacks & kingBB;
+    return opp_any_attacks;
+}
+
+BB Board::sq_attacked_by(BB occ, Square sq) {
+    BB knights, kings, bishopsQueens, rooksQueens;
+    knights        = state.bitboards[n] | state.bitboards[N];
+    kings          = state.bitboards[k] | state.bitboards[K];
+    rooksQueens    = state.bitboards[q] | state.bitboards[Q];
+    bishopsQueens  = state.bitboards[q] | state.bitboards[Q];
+    rooksQueens   |= state.bitboards[r] | state.bitboards[R];
+    bishopsQueens |= state.bitboards[b] | state.bitboards[B];
+
+    return (pawn_attack_table[sq][white] & state.bitboards[p])
+            | (pawn_attack_table[sq][black] & state.bitboards[P])
+            | (knight_attacks(mask(sq)) & knights)
+            | (king_move_table[sq] & kings)
+            | (bishop_moves(sq, occ) & bishopsQueens)
+            | (rook_moves(sq, occ) & rooksQueens)
+            | (x_ray_bishop(occ, sq) & bishopsQueens)
+            | (x_ray_rook(occ, sq) & rooksQueens)
+            ;
+}
+
+bool Board::is_side_in_check(Colour side) {
+    return state.bitboards[k + (side == white ? 6 : 0)] & get_attacked_BB(side);
 }
 
 template <bool GEN_CAPTURES>
@@ -486,7 +509,7 @@ void Board::generate_moves() {
     }
 
     // Caslting
-    if (null_if_check) {
+    if (null_if_check && !GEN_CAPTURES) {
         if (state.side_to_move == white) {
             if (
                 // Can castle
@@ -553,7 +576,6 @@ template void Board::generate_moves<CAPTURES>();
 template void Board::generate_moves<ALLMOVES>();
 
 void Board::make_null_move() {
-    // prev_states.push_back(state);
     prev_state_idx++;
     prev_states[prev_state_idx] = state;
     if (state.side_to_move == black) state.fullmove_counter++;
@@ -565,7 +587,6 @@ void Board::make_null_move() {
 
 [[gnu::hot]]
 void Board::make_move(Move move) {
-    // prev_states.push_back(state);
     prev_state_idx++;
     prev_states[prev_state_idx] = state;
     Key& key = state.hash_key;
@@ -712,10 +733,6 @@ void Board::make_move(Move move) {
 
 [[gnu::hot]]
 void Board::unmake_last_move() {
-    // if (prev_states.size() > 1) {
-    //     state = prev_states.back();
-    //     prev_states.pop_back();
-    // }
     state = prev_states[prev_state_idx];
     prev_state_idx--;
 }
@@ -733,4 +750,41 @@ bool Board::is_rep() {
     if (repetition_count > 2) return true;
 
     return false;
+}
+
+BB Board::get_least_valuable_piece(BB attackdef, Colour side, Piece& piece) {
+    Piece start = side == white ? P : p;
+    Piece end = start + 6;
+    for (piece = start; piece < end; ++piece) {
+        BB sub = attackdef & state.bitboards[piece];
+        if (sub) return sub & -sub;
+    }
+
+    return 0;
+}
+
+std::array<Score, 6> material = { 100, 320, 330, 500, 900, 1000};
+
+Score Board::see(Square to_sq, Piece target, Square from_sq, Piece att_piece) {
+    std::array<Score, 32> gain;
+    int d = 0;
+    BB fromBB = mask(from_sq);
+    BB occ = state.bitboards[allpieces];
+    BB attackdef = sq_attacked_by(occ, to_sq);
+    Colour side = target < 6 ? white : black;
+    gain[d] = material[target > 5 ? target - 6 : target];
+
+    do {
+        d++;
+        gain[d] = material[att_piece > 5 ? att_piece - 6 : att_piece] - gain[d - 1];
+        attackdef ^= fromBB;
+        occ ^= fromBB;
+        side ^= 1;
+        fromBB = get_least_valuable_piece(attackdef, side, att_piece);
+    } while (fromBB);
+
+    while (--d)
+        gain[d-1] = -std::max(-gain[d-1], gain[d]);
+    
+    return gain[0];
 }

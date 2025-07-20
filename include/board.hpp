@@ -177,7 +177,9 @@ private:
     Score eval_rooks();
     Score eval_queens();
     Score eval_kings();
-
+    BB sq_attacked_by(BB occ, Square sq);
+    BB get_attacked_BB(Colour side);
+    BB get_least_valuable_piece(BB attackdef, Colour side, Piece& piece);
 public:
     SearchParams search_params;
     BoardState state;
@@ -187,7 +189,6 @@ public:
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         state.reset();
-        // prev_states.push_back(state);
         prev_states[prev_state_idx] = state;
     }
 
@@ -195,7 +196,13 @@ public:
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen(fen);
-        // prev_states.push_back(state);
+        prev_states[prev_state_idx] = state;
+    }
+
+    Board(const char *fen) {
+        move_generator::init_sliding_move_tables();
+        zobrist::init_keys();
+        load_fen(fen);
         prev_states[prev_state_idx] = state;
     }
 
@@ -204,7 +211,6 @@ public:
         move_generator::init_sliding_move_tables();
         zobrist::init_keys();
         load_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-        // prev_states.push_back(state);
         prev_states[prev_state_idx] = state;
     }
 
@@ -224,6 +230,7 @@ public:
     void run_search();
     bool is_rep();
     void clean_search();
+    Score see(Square to_sq, Piece target, Square from_sq, Piece att_piece);
 };
 
 #endif

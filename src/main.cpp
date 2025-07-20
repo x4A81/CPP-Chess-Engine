@@ -8,6 +8,8 @@
 #include "../include/transposition.hpp"
 #include "../include/book.hpp"
 
+#include "../include/utils.hpp"
+
 Board game_board;
 std::optional<Transposition> game_table;
 std::filesystem::path book_path;

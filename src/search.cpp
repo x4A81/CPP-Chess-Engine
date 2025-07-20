@@ -118,24 +118,31 @@ Score Board::quiescence(Score alpha, Score beta, int ply) {
 
     Score best_val = alpha;
     bool check_flag = true;
-    if (!is_side_in_check(state.side_to_move)) {
-        check_flag = false;
-        Score stand_pat = eval();
-        best_val = stand_pat;
-        if (stand_pat >= beta) return stand_pat;
-        if (stand_pat > alpha) alpha = stand_pat;
-      //  generate_moves<CAPTURES>(); // BUGS IN CAPTURE GEN
-    }
+    Score stand_pat = eval();
+    best_val = stand_pat;
+    generate_moves<CAPTURES>(); 
 
-    //else
-    generate_moves<ALLMOVES>();
+    if (stand_pat >= beta) return stand_pat;
+    if (stand_pat > alpha) alpha = stand_pat;
 
     order_moves(nullmove, ply);
     
     if (is_search_stopped(ply)) return best_val; 
     
     for (Move move : state.move_list) {
-        if (!is_move_capture(move) && !check_flag) continue;
+        // Delta Pruning.
+        int delta = 975;
+        if (get_code(move) >= c_npromo) delta += 775;
+        if (stand_pat < alpha - delta) return alpha;
+
+        // See pruning
+        Square from = get_from_sq(move);
+        Square to = get_to_sq(move);
+        if (to == state.enpassant_square) state.side_to_move == white ? to -= 8 : to += 8;
+        Score see_score = see(to, state.piece_list[to], from, state.piece_list[from]);
+        if (see_score < 0)
+            continue;
+
         make_move(move);
         nodes++;
 
@@ -144,12 +151,6 @@ Score Board::quiescence(Score alpha, Score beta, int ply) {
         unmake_last_move();
 
         if (score >= beta) return score;
-
-        // Delta Pruning.
-        int delta = 975;
-        if (get_code(move) >= c_npromo) delta += 775;
-        if (score < alpha - delta) return alpha;
-        
         if (score > best_val) best_val = score;
         if (score > alpha) alpha = score;
         if (is_search_stopped(ply)) break;

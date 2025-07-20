@@ -235,6 +235,18 @@ namespace move_generator {
         bb >>= 64 - bishop_shifts[sq];
         return bishop_movement_table[sq][bb];
     }
+
+    inline BB x_ray_rook(BB occ, Square rookSq) {
+        BB attacks = rook_moves(rookSq, occ);
+        BB blockers = occ & attacks;
+        return attacks ^ rook_moves(rookSq, occ ^ blockers);
+    }
+
+    inline BB x_ray_bishop(BB occ, Square bishopSq) {
+        BB attacks = bishop_moves(bishopSq, occ);
+        BB blockers = occ & attacks;
+        return attacks ^ bishop_moves(bishopSq, occ ^ blockers);
+    }
 } 
 
 #endif
