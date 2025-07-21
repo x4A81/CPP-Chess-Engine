@@ -214,6 +214,11 @@ public:
         prev_states[prev_state_idx] = state;
     }
 
+    void reset_state_list() {
+        prev_states[0] = state;
+        prev_state_idx = 0;
+    }
+
     void load_fen(std::string fen);
     void print_board();
 

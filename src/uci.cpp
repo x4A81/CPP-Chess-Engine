@@ -253,6 +253,7 @@ bool handle_command(const std::string& command) {
             std::string this_token = tokens.at(token_idx);
             if (parsing_moves) {
                 game_board.make_move(parse_move_string(this_token));
+                game_board.reset_state_list();
             } else {
                 if (this_token == "startpos") {
                     game_board = Board(1);
