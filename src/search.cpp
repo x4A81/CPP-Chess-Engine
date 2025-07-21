@@ -450,6 +450,9 @@ int choose_weighted_book_move(const std::vector<polyglot::BookEntry>& entries) {
 }
 
 void Board::run_search() {
+    prev_state_idx = 0;  // Reset before search
+    prev_states[prev_state_idx] = state;
+
     // First try the opening book
     std::vector<polyglot::BookEntry> entries = polyglot::probe_book(polyglot::gen_poly_key(game_board.state));
 
