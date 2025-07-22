@@ -470,7 +470,13 @@ void Board::run_search() {
 
     if (search_params.move_time == UNUSED && search_params.max_depth == UNUSED && !search_params.infinite) {
         search_params.move_time = (state.side_to_move == white) ? search_params.wtime : search_params.btime;
-        search_params.move_time /= search_params.movestogo;
+        if (search_params.movestogo < 2) {
+            search_params.move_time /= search_params.movestogo <= 0 ? 40 : 1;
+            search_params.move_time -= 100;
+        } else {
+            search_params.move_time /= search_params.movestogo;
+        }
+
         search_params.max_depth = MAX_DEPTH;
         std::println("info string searching for {}ms", search_params.move_time);
         std::fflush(stdout);

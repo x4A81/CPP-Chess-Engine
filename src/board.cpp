@@ -257,56 +257,47 @@ void Board::generate_moves() {
     BB hor_inbetween = 0, ver_inbetween = 0, dia_inbetween = 0, antdia_inbetween = 0;
     BB occ_ex_king = ((state.bitboards[k] | state.bitboards[K]) & ~opponent_pieces) ^ occ;
     BB opp_any_attacks = 0;
-    Square king_sq = bitscan_forward((state.bitboards[k] | state.bitboards[K]) & friendly_pieces);
+    BB kingBB = (state.bitboards[k] | state.bitboards[K]) & friendly_pieces;
+    Square king_sq = bitscan_forward(kingBB);
     BB king_super_dia = bishop_moves(king_sq, occ);
     BB king_super_orth = rook_moves(king_sq, occ);
-    BB kingBB = mask(king_sq);
     BB opp_attacks = 0;
-    BB king_super = 0;
 
     BB opp_rooks = (state.bitboards[r] | state.bitboards[R] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
     
     opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, west);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, east);
-    hor_inbetween |= opp_attacks & king_super;
+    hor_inbetween |= opp_attacks & king_super_orth & precomp_east_fill[king_sq];
 
     opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, east);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, west);
-    hor_inbetween |= opp_attacks & king_super;
+    hor_inbetween |= opp_attacks & king_super_orth & precomp_west_fill[king_sq];
 
     opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, nort);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, sout);
-    ver_inbetween |= opp_attacks & king_super;
+    ver_inbetween |= opp_attacks & king_super_orth & precomp_sout_fill[king_sq];
 
     opp_attacks = sliding_attacks(opp_rooks, occ_ex_king, sout);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, nort);
-    ver_inbetween |= opp_attacks & king_super;
+    ver_inbetween |= opp_attacks & king_super_orth & precomp_nort_fill[king_sq];
     
     BB opp_bishops = (state.bitboards[b] | state.bitboards[B] | state.bitboards[q] | state.bitboards[Q]) & opponent_pieces;
     
     opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, noEast);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, soWest);
-    dia_inbetween |= opp_attacks & king_super;
+    dia_inbetween |= opp_attacks & king_super_dia & precomp_soWest_fill[king_sq];
 
     opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, soWest);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, noEast);
-    dia_inbetween |= opp_attacks & king_super;
+    dia_inbetween |= opp_attacks & king_super_dia & precomp_noEast_fill[king_sq];;
 
     opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, soEast);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, noWest);
-    antdia_inbetween |= opp_attacks & king_super;
+    antdia_inbetween |= opp_attacks & king_super_dia & precomp_noWest_fill[king_sq];
 
     opp_attacks = sliding_attacks(opp_bishops, occ_ex_king, noWest);
     opp_any_attacks |= opp_attacks;
-    king_super = sliding_attacks(kingBB, occ, soEast);
-    antdia_inbetween |= opp_attacks & king_super;
+    antdia_inbetween |= opp_attacks & king_super_dia & precomp_soEast_fill[king_sq];
 
     // Non-sliding pieces
     opp_any_attacks |= knight_attacks((state.bitboards[n] | state.bitboards[N]) & opponent_pieces);
@@ -358,26 +349,17 @@ void Board::generate_moves() {
     // Rook and Queen moves
     BB rooks = (state.bitboards[r] | state.bitboards[R] | state.bitboards[q] | state.bitboards[Q]) & friendly_pieces;
 
-    // horizontal
-    BB sliders = rooks & ~(all_inbetween ^ hor_inbetween);
-    while (sliders) {
-        Square from_sq = pop_lsb(sliders);
-
-        BB slider_movement = rook_moves(from_sq, occ) & move_mask & precomp_hor_fill[from_sq];
-        while (slider_movement) {
-            Square to_sq = pop_lsb(slider_movement);
-            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+    while (rooks) {
+        Square from_sq = pop_lsb(rooks);
+        BB moves = move_mask & rook_moves(from_sq, occ);
+        if (get_bit(all_inbetween, from_sq)) {
+            if (get_bit(hor_inbetween, from_sq)) moves &= precomp_hor_fill[from_sq];
+            else if (get_bit(ver_inbetween, from_sq)) moves &= precomp_ver_fill[from_sq];
+            else if (get_bit(dia_inbetween | antdia_inbetween, from_sq)) moves &= 0;
         }
-    }
 
-    // vertical
-    sliders = rooks & ~(all_inbetween ^ ver_inbetween);
-    while (sliders) {
-        Square from_sq = pop_lsb(sliders);
-
-        BB slider_movement = rook_moves(from_sq, occ) & move_mask & precomp_ver_fill[from_sq];
-        while (slider_movement) {
-            Square to_sq = pop_lsb(slider_movement);
+        while (moves) {
+            Square to_sq = pop_lsb(moves);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -385,26 +367,17 @@ void Board::generate_moves() {
     // Queen and bishop moves
     BB bishops = (state.bitboards[b] | state.bitboards[B] | state.bitboards[q] | state.bitboards[Q]) & friendly_pieces;
 
-    // Diagonal
-    sliders = bishops & ~(all_inbetween ^ dia_inbetween);
-    while (sliders) {
-        Square from_sq = pop_lsb(sliders);
-
-        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & precomp_dia_fill[from_sq];
-        while (slider_movement) {
-            Square to_sq = pop_lsb(slider_movement);
-            state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+    while (bishops) {
+        Square from_sq = pop_lsb(bishops);
+        BB moves = move_mask & bishop_moves(from_sq, occ);
+        if (get_bit(all_inbetween, from_sq)) {
+            if (get_bit(dia_inbetween, from_sq)) moves &= precomp_dia_fill[from_sq];
+            else if (get_bit(antdia_inbetween, from_sq)) moves &= precomp_antdia_fill[from_sq];
+            else if (get_bit(hor_inbetween | ver_inbetween, from_sq)) moves &= 0;
         }
-    }
 
-    // Antidiagonal
-    sliders = bishops & ~(all_inbetween ^ antdia_inbetween);
-    while (sliders) {
-        Square from_sq = pop_lsb(sliders);
-
-        BB slider_movement = bishop_moves(from_sq, occ) & move_mask & precomp_antdia_fill[from_sq];
-        while (slider_movement) {
-            Square to_sq = pop_lsb(slider_movement);
+        while (moves) {
+            Square to_sq = pop_lsb(moves);
             state.move_list.add(generate_move_nopromo(from_sq, to_sq));
         }
     }
@@ -442,44 +415,15 @@ void Board::generate_moves() {
     BB targets = (opponent_pieces & move_mask) | ep_mask;
     pawns = (state.bitboards[p] | state.bitboards[P]) & friendly_pieces;
 
-    BB attacking = pawns & ~(all_inbetween ^ dia_inbetween);
-    while (attacking) {
-        Square from_sq = pop_lsb(attacking);
+    while (pawns) {
+        Square from_sq = pop_lsb(pawns);
 
-        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & precomp_dia_fill[from_sq];
-        while (movement_mask) {
-            Square to_sq = pop_lsb(movement_mask);
-
-            if (to_sq == state.enpassant_square) {
-                if (null_if_check) {
-                    BB c_occ = occ;
-                    pop_bit(c_occ, from_sq);
-                    pop_bit(c_occ, (state.side_to_move == white ? to_sq - 8 : to_sq + 8));
-                    if (precomp_hor_fill[king_sq] & rook_moves(king_sq, c_occ) & opp_rooks) {
-                        // enpassant is not legal
-                        continue;
-                    }
-                } else
-                    if (!(mask(state.enpassant_square + (state.side_to_move == white ? -8 : 8)) & to_checkers_mask)
-                    && !(mask(state.enpassant_square) & to_checkers_mask)) continue;
-            }
-
-            if (to_sq >= a8 || to_sq <= h1) {
-                Move move_no_promo = generate_move_nopromo(from_sq, to_sq);
-                state.move_list.add((c_npromo << 12) | move_no_promo);
-                state.move_list.add((c_bpromo << 12) | move_no_promo);
-                state.move_list.add((c_rpromo << 12) | move_no_promo);
-                state.move_list.add((c_qpromo << 12) | move_no_promo);
-            } else
-                state.move_list.add(generate_move_nopromo(from_sq, to_sq));
+        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets;
+        if (get_bit(all_inbetween, from_sq)) {
+            if (get_bit(dia_inbetween, from_sq)) movement_mask &= precomp_dia_fill[from_sq];
+            else if (get_bit(antdia_inbetween, from_sq)) movement_mask &= precomp_antdia_fill[from_sq];
+            else if (get_bit(hor_inbetween | ver_inbetween, from_sq)) movement_mask &= 0;
         }
-    }
-
-    attacking = pawns & ~(all_inbetween ^ antdia_inbetween);
-    while (attacking) {
-        Square from_sq = pop_lsb(attacking);
-
-        BB movement_mask = pawn_attack_table[from_sq][state.side_to_move] & targets & precomp_antdia_fill[from_sq];
         while (movement_mask) {
             Square to_sq = pop_lsb(movement_mask);
 

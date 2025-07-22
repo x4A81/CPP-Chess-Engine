@@ -229,7 +229,7 @@ namespace bb_math {
     /// @param sq Square index in bitboard to get.
     /// @return 1 if bit is set, 0 if not set.
     [[gnu::always_inline, gnu::hot]]
-    inline int get_bit(BB bb, Square sq) { return (bb >> sq) & 1; }
+    inline bool get_bit(BB bb, Square sq) { return bb & (BB(1) << sq); }
 
     /// @brief Population counter helper.
     /// @param bb Bitboard to count.
